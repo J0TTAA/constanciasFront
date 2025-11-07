@@ -4,9 +4,7 @@
       Usamos v-main para centrar todo.
       El gradiente ahora se aplica con una clase de CSS para más control.
     -->
-    <v-main
-      class="d-flex align-center justify-center pa-4 gradient-background"
-    >
+    <v-main class="d-flex align-center justify-center pa-4 gradient-background">
       <v-responsive max-width="448">
         <!--
           Vuetify usa v-card, que es equivalente a tu Card de React.
@@ -16,20 +14,17 @@
           <!--
             v-card-title y v-card-subtitle equivalen a tu CardHeader y CardDescription
           -->
-          <v-card-title
-            class="pa-6 pb-2 text-center"
-            style="line-height: 1.4"
-          >
+          <v-card-title class="pa-6 pb-2 text-center" style="line-height: 1.4">
             <!-- Logo -->
             <div class="d-flex justify-center mb-5">
-              <v-sheet
-                color="primary"
-                height="50"
-                width="50"
-                class="rounded-lg d-flex align-center justify-center"
-              >
-                <span class="text-white text-h5 font-weight-bold">S</span>
-              </v-sheet>
+              <v-img
+                src="/logoufro.png"
+                alt="Logo Sistema de Gestión de Constancias"
+                width="72"
+                height="72"
+                class="login-logo"
+                contain
+              ></v-img>
             </div>
 
             <!-- Título -->
@@ -179,5 +174,11 @@ const rules = {
 */
 .gradient-background {
   background: linear-gradient(to bottom, #1e5a3d, #164d32);
+}
+
+.login-logo {
+  border-radius: 16px;
+
+  padding: 8px;
 }
 </style>

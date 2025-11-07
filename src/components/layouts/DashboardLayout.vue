@@ -8,12 +8,16 @@
       color="#1e5a3d"
       theme="dark"
       app
+      class="sidebar-drawer"
     >
-      <v-list-item class="pa-4">
-        <!-- Aquí puedes poner el logo que se ve en tus capturas -->
-        <v-list-item-title class="text-h6 font-weight-bold">
-          Mi Aplicación
-        </v-list-item-title>
+      <v-list-item class="pa-4 d-flex justify-center">
+        <v-img
+          src="/unnamed.jpg"
+          alt="Logo Sistema de Gestión de Constancias"
+          class="sidebar-logo"
+          width="140"
+          contain
+        ></v-img>
       </v-list-item>
 
       <v-divider></v-divider>
@@ -23,7 +27,7 @@
         Aquí está la magia: iteramos sobre el getter 'sidebarLinks'
         de nuestro store. El store decide qué links mostrar.
       -->
-      <v-list density="compact" nav>
+      <v-list density="compact" nav class="sidebar-links">
         <v-list-item
           v-for="link in auth.sidebarLinks"
           :key="link.to"
@@ -37,7 +41,7 @@
 
       <template v-slot:append>
         <!-- === PERFIL DE USUARIO === -->
-        <div class="pa-4">
+        <div class="pa-4 sidebar-footer">
           <v-card class="rounded-lg" color="rgba(255, 255, 255, 0.1)" variant="flat">
             <v-card-text>
               <div class="font-weight-bold">{{ auth.user.name }}</div>
@@ -46,7 +50,7 @@
           </v-card>
 
           <v-btn
-            @click="auth.logout"
+            @click="handleLogout"
             variant="text"
             prepend-icon="mdi-logout"
             block
@@ -87,9 +91,11 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplay } from 'vuetify'
+import { useRouter } from 'vue-router'
 
 const auth = useAuthStore()
 const { name } = useDisplay()
+const router = useRouter()
 
 // Control del sidebar en móviles
 const drawer = ref(true)
@@ -99,6 +105,11 @@ const isMobile = computed(() => name.value === 'xs' || name.value === 'sm')
 if (isMobile.value) {
   drawer.value = false
 }
+
+const handleLogout = () => {
+  auth.logout()
+  router.push('/')
+}
 </script>
 
 <style scoped>
@@ -106,5 +117,29 @@ if (isMobile.value) {
 .v-list-item--active {
   background-color: rgba(255, 255, 255, 0.2) !important;
   color: white !important;
+}
+
+.sidebar-logo {
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-drawer {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.sidebar-links {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 </style>
