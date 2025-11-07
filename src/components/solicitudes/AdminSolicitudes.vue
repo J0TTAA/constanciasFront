@@ -47,7 +47,7 @@ const headers = ref([
   { title: 'FECHA SOLICITUD', key: 'fecha' },
   { title: 'ESTADO', key: 'estado' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
-])
+]as const)
 
 // --- Datos de simulación (Mock data) ---
 const solicitudes = ref([
