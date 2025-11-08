@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="solicitudes-page">
     <!-- Título y subtítulo que son comunes a todos -->
     <h1 class="text-h4 font-weight-bold">Panel de Solicitudes</h1>
     <p class="mt-2 text-medium-emphasis">
@@ -30,3 +30,9 @@ import AdminSolicitudes from '@/components/solicitudes/AdminSolicitudes.vue'
 
 const auth = useAuthStore()
 </script>
+
+<style scoped>
+.solicitudes-page {
+  width: 100%;
+}
+</style>

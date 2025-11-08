@@ -48,59 +48,40 @@
             Usamos v-form para manejar el submit.
           -->
           <v-card-text class="pa-6">
-            <!--
-              v-form nos da validación y un evento @submit.prevent
-              que es el equivalente a onSubmit de React.
-            -->
-            <v-form @submit.prevent="handleSubmit">
-              <!-- Campo de Email -->
-              <v-text-field
-                v-model="email"
-                label="Correo Electrónico"
-                type="email"
-                prepend-inner-icon="mdi-email-outline"
-                variant="outlined"
-                :rules="[rules.required, rules.email]"
-                required
-              ></v-text-field>
-
-              <!-- Campo de Contraseña -->
-              <v-text-field
-                v-model="password"
-                label="Contraseña"
-                type="password"
-                prepend-inner-icon="mdi-lock-outline"
-                variant="outlined"
-                :rules="[rules.required]"
-                required
-                class="mt-3"
-              ></v-text-field>
-
-              <!-- Alerta de Error -->
-              <v-alert
-                v-if="error"
-                type="error"
-                variant="tonal"
-                class="mt-2 mb-3 text-caption"
-                density="compact"
-              >
-                {{ error }}
-              </v-alert>
-
-              <!-- Botón de Ingreso -->
+            <div class="d-flex flex-column gap-3">
               <v-btn
                 :loading="isLoading"
                 :disabled="isLoading"
-                type="submit"
                 color="primary"
                 size="large"
                 block
-                class="mt-4"
+                class="mt-2"
                 style="font-family: 'Merriweather', serif; text-transform: none"
+                @click="login"
               >
-                Ingresar
+                Ingresar con Auth0
               </v-btn>
-            </v-form>
+
+              <v-btn
+                variant="outlined"
+                size="large"
+                block
+                style="font-family: 'Merriweather', serif; text-transform: none"
+                @click="register"
+              >
+                Crear cuenta
+              </v-btn>
+            </div>
+
+            <v-alert
+              v-if="error"
+              type="error"
+              variant="tonal"
+              class="mt-4 text-caption"
+              density="compact"
+            >
+              {{ error }}
+            </v-alert>
 
             <p
               class="text-center text-caption text-disabled mt-6"
@@ -116,55 +97,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router' // <-- IMPORTAMOS el router
-import { useAuthStore } from '@/stores/auth' // Importamos el store
+import { computed } from 'vue'
+import { useAuth0 } from '@auth0/auth0-vue'
+import { useAuthStore } from '@/stores/auth'
 
-// --- LÓGICA (Reemplaza a useState) ---
-const email = ref('')
-const password = ref('')
-const isLoading = ref(false)
-const error = ref<string | null>(null) // Para mostrar errores de login
+const auth0 = useAuth0()
+const auth = useAuthStore()
 
-// --- OBTENER INSTANCIAS ---
-const router = useRouter() // Obtenemos el router para navegar
-const auth = useAuthStore() // Obtenemos el store
+const isLoading = computed(() => auth0.isLoading.value)
+const error = computed(() => auth.errorMessage)
 
-// --- MANEJADOR DE SUBMIT (Formulario) ---
-const handleSubmit = async () => {
-  isLoading.value = true
-  error.value = null
+const redirectUri = import.meta.env.VITE_AUTH0_REDIRECT_URI
+
+const login = async () => {
+  auth.clearError()
 
   try {
-    // Llamamos a la acción del store, que ahora es asíncrona
-    const loginExitoso = await auth.login(email.value, password.value)
-
-    if (loginExitoso) {
-      // --- NAVEGACIÓN ---
-      // Si el login fue exitoso, el *componente* nos redirige.
-      // Redirigimos a la primera página de nuestro dashboard.
-      await router.push('/dashboard/solicitudes')
-    } else {
-      // Si el store devuelve false, mostramos un error
-      error.value = 'Correo electrónico o contraseña incorrectos.'
-    }
+    await auth0.loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: redirectUri,
+      },
+    })
   } catch (err) {
-    // Si la API falla (simulado o real), mostramos un error
-    console.error(err)
-    error.value = 'Ocurrió un error inesperado. Intente de nuevo.'
-  } finally {
-    // Esto se ejecuta siempre, al éxito o al error
-    isLoading.value = false
+    auth.captureError(err)
   }
 }
 
-// --- Reglas de Validación de Vuetify ---
-const rules = {
-  required: (value: string) => !!value || 'Este campo es requerido.',
-  email: (value: string) => {
-    const pattern = /.+@.+\..+/
-    return pattern.test(value) || 'Debe ser un correo válido.'
-  },
+const register = async () => {
+  auth.clearError()
+
+  try {
+    await auth0.loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: redirectUri,
+        screen_hint: 'signup',
+      },
+    })
+  } catch (err) {
+    auth.captureError(err)
+  }
 }
 </script>
 

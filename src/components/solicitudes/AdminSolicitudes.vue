@@ -1,79 +1,199 @@
 <template>
-  <div>
-    <!--
-      Nota: Esta vista no tiene el botón de "Nueva Solicitud"
-    -->
+  <div class="solicitudes-wrapper">
+    <template v-if="!selectedRequest">
+      <v-card class="rounded-lg" variant="outlined" color="#e0e0e0">
+        <v-data-table
+          :headers="headers"
+          :items="tableItems"
+          class="rounded-lg"
+        >
+          <template v-slot:[`item.estado`]="{ value }">
+            <v-chip
+              :color="getStatusColor(value)"
+              :prepend-icon="getStatusIcon(value)"
+              size="small"
+            >
+              {{ value }}
+            </v-chip>
+          </template>
 
-    <!-- 1. La Tabla de Administración -->
-    <v-card class="rounded-lg" variant="outlined" color="#e0e0e0">
-      <v-data-table
-        :headers="headers"
-        :items="solicitudes"
-        class="rounded-lg"
-      >
-        <!-- Plantilla para la columna de ESTADO -->
-        <template v-slot:item.estado="{ value }">
-          <v-chip :color="getStatusColor(value)" :prepend-icon="getStatusIcon(value)" size="small">
-            {{ value }}
-          </v-chip>
-        </template>
+          <template v-slot:[`item.actions`]="{ item }">
+            <v-btn
+              variant="text"
+              color="primary"
+              append-icon="mdi-chevron-right"
+              density="compact"
+              @click="handleSlotItemOpen(item)"
+            >
+              Ver Detalles
+            </v-btn>
+          </template>
 
-        <!-- Plantilla para la columna de ACCIONES -->
-        <template v-slot:item.actions>
-          <v-btn variant="text" color="primary" append-icon="mdi-chevron-right" density="compact">
-            Ver Detalles
-          </v-btn>
-        </template>
+          <template #no-data>
+            <p class="pa-4 text-center">No hay solicitudes pendientes.</p>
+          </template>
+        </v-data-table>
+      </v-card>
+    </template>
 
-        <!-- Mensaje cuando no hay datos -->
-        <template v-slot:no-data>
-          <p class="pa-4 text-center">No hay solicitudes pendientes.</p>
-        </template>
-
-      </v-data-table>
-    </v-card>
+    <request-detail
+      v-else-if="selectedRequest"
+      :request="selectedRequest"
+      :user="currentUser"
+      @back="handleBack"
+      @update="handleRequestUpdate"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import type { VDataTable } from 'vuetify/components'
+import { useAuthStore } from '@/stores/auth'
+import RequestDetail from './RequestDetail.vue'
+import { RequestStatus, UserRole } from '@/types/requestTypes'
+import type { Request, User } from '@/types/requestTypes'
+import { mockRequests } from '@/mocks/requests'
 
-// --- Cabeceras de la tabla (Vista Admin/Secretaria/Director) ---
-// ¡Nota la columna extra 'estudiante'!
-const headers = ref([
+const auth = useAuthStore()
+
+const cloneRequest = (request: Request): Request => ({
+  ...request,
+  history: request.history.map((entry) => ({ ...entry })),
+})
+
+const requests = ref<Request[]>(mockRequests.map(cloneRequest))
+const selectedRequestId = ref<string | null>(null)
+
+const headers = ref<VDataTable['$props']['headers']>([
   { title: 'ID SOLICITUD', key: 'id' },
-  { title: 'ESTUDIANTE', key: 'estudiante' }, // <-- La columna clave
+  { title: 'ESTUDIANTE', key: 'estudiante' },
   { title: 'TIPO CONSTANCIA', key: 'tipo' },
   { title: 'FECHA SOLICITUD', key: 'fecha' },
   { title: 'ESTADO', key: 'estado' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
-]as const)
-
-// --- Datos de simulación (Mock data) ---
-const solicitudes = ref([
-  { id: 'RRNN-24001', estudiante: 'Ana Contreras', tipo: 'Alumno Regular', fecha: '15-07-2024', estado: 'Firmado y Disponible' },
-  { id: 'RRNN-24002', estudiante: 'Carlos Díaz', tipo: 'Notas', fecha: '18-07-2024', estado: 'Para Firma' },
-  { id: 'RRNN-24003', estudiante: 'Ana Contreras', tipo: 'Asignaturas Inscritas', fecha: '20-07-2024', estado: 'En Revisión' },
-  { id: 'RRNN-24004', estudiante: 'Carlos Díaz', tipo: 'Rendición de Examen de Calificación', fecha: '22-07-2024', estado: 'Solicitado' },
 ])
 
-// --- Lógica para los chips de estado ---
+const formatDate = (isoDate: string) =>
+  new Date(isoDate).toLocaleDateString('es-CL')
+
+const tableItems = computed(() =>
+  requests.value.map((request) => ({
+    id: request.id,
+    estudiante: request.studentName,
+    tipo: request.type,
+    fecha: formatDate(request.requestDate),
+    estado: request.status,
+    raw: request,
+  })),
+)
+
+const selectedRequest = computed<Request | null>(() => {
+  if (!selectedRequestId.value) return null
+  return requests.value.find((request) => request.id === selectedRequestId.value) ?? null
+})
+
+const roleMap: Record<string, UserRole> = {
+  Secretaria: UserRole.SECRETARY,
+  Director: UserRole.DIRECTOR,
+  Administrador: UserRole.ADMIN,
+}
+
+const currentUser = computed<User>(() => ({
+  id: auth.user.email ?? 'usuario@ufro.cl',
+  name: auth.user.name ?? 'Equipo Programa',
+  email: auth.user.email ?? 'usuario@ufro.cl',
+  role: roleMap[auth.user.role ?? ''] ?? UserRole.SECRETARY,
+}))
+
+const handleSlotItemOpen = (slotItem: unknown) => {
+  const casted = slotItem as { raw?: { id?: string | null } }
+  const idCandidate = casted?.raw?.id ?? null
+  openDetails(idCandidate)
+}
+
+const openDetails = (id: string | null | undefined) => {
+  if (!id) return
+  selectedRequestId.value = id
+}
+
+const handleBack = () => {
+  selectedRequestId.value = null
+}
+
+const appendHistory = (
+  request: Request,
+  status: RequestStatus,
+  observation: string,
+) => {
+  request.history = [
+    ...request.history,
+    {
+      id: `${request.id}-${request.history.length + 1}`,
+      date: new Date().toISOString(),
+      user: currentUser.value.name,
+      status,
+      observation,
+    },
+  ]
+
+  request.lastUpdateDate = new Date().toISOString()
+}
+
+const handleRequestUpdate = (
+  id: string,
+  newStatus: RequestStatus,
+  observation: string,
+  fileUrl?: string,
+) => {
+  const request = requests.value.find((item) => item.id === id)
+  if (!request) return
+
+  request.status = newStatus
+  if (fileUrl) {
+    request.fileUrl = fileUrl
+  }
+
+  appendHistory(request, newStatus, observation)
+}
+
 const getStatusColor = (estado: string) => {
   switch (estado) {
-    case 'Firmado y Disponible': return 'success'
-    case 'En Revisión': return 'warning'
-    case 'Para Firma': return 'info'
-    case 'Solicitado': return 'blue'
-    default: return 'grey'
+    case RequestStatus.SIGNED:
+      return 'success'
+    case RequestStatus.IN_REVIEW:
+      return 'warning'
+    case RequestStatus.AWAITING_SIGNATURE:
+      return 'info'
+    case RequestStatus.REQUESTED:
+      return 'blue'
+    case RequestStatus.REJECTED:
+      return 'error'
+    default:
+      return 'grey'
   }
 }
+
 const getStatusIcon = (estado: string) => {
   switch (estado) {
-    case 'Firmado y Disponible': return 'mdi-check-circle'
-    case 'En Revisión': return 'mdi-clock-outline'
-    case 'Para Firma': return 'mdi-draw-pen'
-    case 'Solicitado': return 'mdi-file-document'
-    default: return 'mdi-help-circle'
+    case RequestStatus.SIGNED:
+      return 'mdi-check-circle'
+    case RequestStatus.IN_REVIEW:
+      return 'mdi-clock-outline'
+    case RequestStatus.AWAITING_SIGNATURE:
+      return 'mdi-draw-pen'
+    case RequestStatus.REQUESTED:
+      return 'mdi-file-document'
+    case RequestStatus.REJECTED:
+      return 'mdi-close-circle'
+    default:
+      return 'mdi-help-circle'
   }
 }
 </script>
+
+<style scoped>
+.solicitudes-wrapper {
+  padding-left: 12px;
+}
+</style>

@@ -24,6 +24,12 @@ const router = createRouter({
       meta: { requiresAuth: false }, // No requiere auth para ver el login
     },
     {
+      path: '/auth/callback',
+      name: 'auth-callback',
+      component: () => import('@/pages/AuthCallback.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       // --- RUTA PADRE "DASHBOARD" ---
       path: '/dashboard',
       component: DashboardLayout, // Carga el "cascarón"
@@ -75,6 +81,10 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !isLoggedIn) {
     // Si la requiere Y NO está logueado, lo mandamos al login
     return next({ name: 'login' })
+  }
+
+  if (to.name === 'login' && isLoggedIn) {
+    return next({ name: 'dashboard-solicitudes' })
   }
 
   // --- 2. ¿La ruta requiere roles? ---

@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app class="dashboard-app">
     <!-- === SIDEBAR (Navigation Drawer) === -->
     <v-navigation-drawer
       v-model="drawer"
@@ -9,6 +9,9 @@
       theme="dark"
       app
       class="sidebar-drawer"
+      :elevation="12"
+      :width="drawerWidth"
+      :class="{ 'sidebar-fixed': !isMobile }"
     >
       <v-list-item class="pa-4 d-flex justify-center">
         <v-img
@@ -49,13 +52,7 @@
             </v-card-text>
           </v-card>
 
-          <v-btn
-            @click="handleLogout"
-            variant="text"
-            prepend-icon="mdi-logout"
-            block
-            class="mt-2"
-          >
+          <v-btn @click="handleLogout" variant="text" prepend-icon="mdi-logout" block class="mt-2">
             Cerrar Sesión
           </v-btn>
         </div>
@@ -70,25 +67,25 @@
     </v-app-bar>
 
     <!-- === CONTENIDO PRINCIPAL === -->
-    <v-main style="background-color: #f4f7f6">
+    <v-main class="dashboard-main" :style="mainStyle">
       <!--
         Aquí es donde Vue Router inyectará las páginas
         (SolicitudesPage, AdminPage, etc.)
       -->
       <router-view v-slot="{ Component }">
-        <v-container fluid class="pa-6">
+        <div class="dashboard-container">
           <!-- Transición opcional entre páginas -->
           <v-fade-transition mode="out-in">
             <component :is="Component" />
           </v-fade-transition>
-        </v-container>
+        </div>
       </router-view>
     </v-main>
   </v-app>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplay } from 'vuetify'
 import { useRouter } from 'vue-router'
@@ -100,14 +97,33 @@ const router = useRouter()
 // Control del sidebar en móviles
 const drawer = ref(true)
 const isMobile = computed(() => name.value === 'xs' || name.value === 'sm')
+const drawerWidth = computed(() => (isMobile.value ? 220 : 256))
+const mainStyle = computed(() =>
+  isMobile.value
+    ? {}
+    : {
+        marginLeft: `${drawerWidth.value}px`,
+        width: `calc(100% - ${drawerWidth.value}px)`,
+        maxWidth: 'none',
+        marginRight: '0',
+        display: 'flex',
+        justifyContent: 'flex-start',
+      },
+)
 
 // En móvil, el sidebar empieza cerrado
 if (isMobile.value) {
   drawer.value = false
 }
 
-const handleLogout = () => {
-  auth.logout()
+watchEffect(() => {
+  if (!isMobile.value) {
+    drawer.value = true
+  }
+})
+
+const handleLogout = async () => {
+  await auth.logout()
   router.push('/')
 }
 </script>
@@ -127,10 +143,16 @@ const handleLogout = () => {
 .sidebar-drawer {
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
   height: 100vh;
   max-height: 100vh;
+}
+
+.sidebar-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 10;
 }
 
 .sidebar-links {
@@ -141,5 +163,28 @@ const handleLogout = () => {
 
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dashboard-app {
+  min-height: 100vh;
+  display: flex;
+  background-color: #eef2f0;
+  overflow: hidden;
+}
+
+.dashboard-main {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #f4f7f6 0%, #eef2f0 100%);
+  display: flex;
+  align-items: flex-start;
+  padding: 0;
+}
+
+.dashboard-container {
+  padding: 8px 12px;
+  min-height: 100%;
+  width: 100%;
 }
 </style>

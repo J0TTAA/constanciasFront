@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { useAuth0 } from '@auth0/auth0-vue'
 // import { useRouter } from 'vue-router' // <-- ¡NO LO IMPORTAMOS AQUÍ! Es mala práctica.
 
 // --- 1. ARREGLO DEL ERROR DE TYPESCRIPT ---
@@ -17,6 +18,8 @@ interface User {
 }
 
 export const useAuthStore = defineStore('auth', () => {
+  const auth0 = useAuth0()
+
   // --- STATE ---
   const user = ref<User>({
     name: null,
@@ -24,13 +27,14 @@ export const useAuthStore = defineStore('auth', () => {
     role: null,
   })
   const token = ref<string | null>(null)
+  const errorMessage = ref<string | null>(null)
   // const router = useRouter() // <-- LO QUITAMOS. La navegación la hacen los componentes.
 
   // --- GETTERS ---
   //
   // --- 2. ARREGLO DEL BUG DEL LOGIN ---
   // Comprobamos el 'role' del usuario, no solo el objeto 'user'
-  const isLoggedIn = computed(() => !!token.value && !!user.value.role)
+  const isLoggedIn = computed(() => !!token.value)
 
   const sidebarLinks = computed(() => {
     const links: SidebarLink[] = []
@@ -75,50 +79,87 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- ACTIONS ---
 
-  // --- 3. ARREGLO DE LA ACCIÓN LOGIN ---
-  // La convertimos en 'async' y devolvemos un 'boolean'
-  // para que LoginPage.vue sepa si debe navegar o no.
-  async function login(email: string, password: string): Promise<boolean> {
-    // Para que la advertencia 'password' desaparezca (opcional)
-    console.log('Intentando login con:', email, 'y pass:', password ? '...' : 'vacío')
+  function extractRoleFromAuth0Claims(auth0User: Record<string, unknown>): User['role'] {
+    const claimKey = import.meta.env.VITE_AUTH0_ROLE_CLAIM
 
-    // Simulamos una llamada a la API
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    if (!claimKey) return null
 
-    // --- SIMULACIÓN ---
-    if (email.includes('admin')) {
-      user.value = { name: 'Admin', email: email, role: 'Administrador' }
-    } else if (email.includes('secretaria')) {
-      user.value = { name: 'Mariela Gonzalez', email: email, role: 'Secretaria' }
-    } else if (email.includes('director')) {
-      user.value = { name: 'Francisco Matus', email: email, role: 'Director' }
-    } else if (email.includes('estudiante')) {
-      user.value = { name: 'Ana Contreras', email: email, role: 'Estudiante' }
-    } else {
-      // Si el correo no coincide con nada, fallamos el login
-      return false
-    }
+    const claimValue = auth0User?.[claimKey]
 
-    token.value = 'fake-token-123'
-    console.log('Login simulado con:', user.value.role) // Log para depurar
-    return true // Devolvemos 'true' si el login fue exitoso
-    // --- FIN SIMULACIÓN ---
+    const normalizedClaim = Array.isArray(claimValue) ? claimValue[0] : claimValue
+
+    if (typeof normalizedClaim !== 'string') return null
+
+    const allowedRoles: User['role'][] = ['Estudiante', 'Secretaria', 'Director', 'Administrador']
+
+    return allowedRoles.includes(normalizedClaim as User['role']) ? (normalizedClaim as User['role']) : null
   }
 
-  // --- 4. ARREGLO DE LA ACCIÓN LOGOUT ---
-  // Quitamos el 'router.push()'. El componente se encarga de eso.
-  function logout() {
+  function setSessionFromAuth0(
+    auth0User: Record<string, unknown> | null | undefined,
+    rawToken?: string | null
+  ) {
+    if (!auth0User) {
+      clearSession()
+      return
+    }
+
+    user.value = {
+      name: (auth0User.name as string | undefined) ?? null,
+      email: (auth0User.email as string | undefined) ?? null,
+      role: extractRoleFromAuth0Claims(auth0User),
+    }
+
+    const resolvedToken =
+      rawToken ??
+      (typeof auth0User.sub === 'string' ? (auth0User.sub as string) : null) ??
+      'auth0-session'
+
+    token.value = resolvedToken
+    errorMessage.value = null
+  }
+
+  function clearSession() {
     user.value = { name: null, email: null, role: null }
     token.value = null
+    errorMessage.value = null
     // El DashboardLayout.vue se encargará de redirigir
+  }
+
+  function captureError(err: unknown) {
+    console.error(err)
+    errorMessage.value = err instanceof Error ? err.message : 'Ocurrió un error inesperado.'
+  }
+
+  function clearError() {
+    errorMessage.value = null
+  }
+
+  async function logout() {
+    try {
+      const logoutUrl =
+        import.meta.env.VITE_AUTH0_LOGOUT_URL ?? window.location.origin
+
+      await auth0.logout({
+        logoutParams: {
+          returnTo: logoutUrl,
+        },
+      })
+    } finally {
+      clearSession()
+    }
   }
 
   return {
     user,
     token,
     isLoggedIn,
+    errorMessage,
     sidebarLinks,
-    login,
+    setSessionFromAuth0,
+    clearSession,
+    captureError,
+    clearError,
     logout,
   }
 })
