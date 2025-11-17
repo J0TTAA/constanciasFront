@@ -46,16 +46,8 @@ interface ResolvedAuth0Session {
 }
 
 async function resolveAuth0Session(): Promise<ResolvedAuth0Session | null> {
-  let claims: Record<string, unknown> | null = null
-
-  try {
-    if (typeof auth0.getIdTokenClaims === 'function') {
-      const idTokenClaims = await auth0.getIdTokenClaims()
-      claims = (idTokenClaims ?? null) as unknown as Record<string, unknown> | null
-    }
-  } catch (error) {
-    console.warn('No se pudo obtener el ID Token de Auth0.', error)
-  }
+  const claims = (auth0.idTokenClaims.value ??
+    null) as unknown as Record<string, unknown> | null
 
   const userCandidate =
     (auth0.user.value as unknown as Record<string, unknown> | null | undefined) ?? claims
