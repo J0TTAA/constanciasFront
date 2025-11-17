@@ -28,7 +28,6 @@ app.use(
     },
     cacheLocation: "localstorage",
     useRefreshTokens: true,
-    skipRedirectCallback: true,
   })
 )
 

@@ -100,10 +100,10 @@ const roleMap: Record<string, UserRole> = {
 }
 
 const currentUser = computed<User>(() => ({
-  id: auth.user.email ?? 'usuario@ufro.cl',
-  name: auth.user.name ?? 'Equipo Programa',
-  email: auth.user.email ?? 'usuario@ufro.cl',
-  role: roleMap[auth.user.role ?? ''] ?? UserRole.SECRETARY,
+  id: auth.user?.email ?? 'usuario@ufro.cl',
+  name: auth.user?.name ?? 'Equipo Programa',
+  email: auth.user?.email ?? 'usuario@ufro.cl',
+  role: roleMap[auth.user?.role ?? ''] ?? UserRole.SECRETARY,
 }))
 
 const handleSlotItemOpen = (slotItem: unknown) => {

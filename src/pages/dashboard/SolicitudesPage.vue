@@ -4,7 +4,7 @@
     <h1 class="text-h4 font-weight-bold">Panel de Solicitudes</h1>
     <p class="mt-2 text-medium-emphasis">
       {{
-        auth.user.role === 'Estudiante'
+        auth.user?.role === 'Estudiante'
           ? 'Bienvenido. Aquí puede ver sus solicitudes de constancias.'
           : 'Bienvenido. Aquí están las solicitudes pendientes de revisión.'
       }}
@@ -16,7 +16,7 @@
       de Estudiante. Si no, muestra el componente de Admin."
     -->
     <estudiante-solicitudes
-      v-if="auth.user.role === 'Estudiante'"
+      v-if="auth.user?.role === 'Estudiante'"
       class="mt-6"
     />
     <admin-solicitudes v-else class="mt-6" />

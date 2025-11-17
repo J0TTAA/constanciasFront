@@ -47,8 +47,8 @@
         <div class="pa-4 sidebar-footer">
           <v-card class="rounded-lg" color="rgba(255, 255, 255, 0.1)" variant="flat">
             <v-card-text>
-              <div class="font-weight-bold">{{ auth.user.name }}</div>
-              <div class="text-caption">{{ auth.user.role }}</div>
+              <div class="font-weight-bold">{{ auth.user?.name ?? 'Usuario' }}</div>
+              <div class="text-caption">{{ auth.user?.role ?? 'Sin rol' }}</div>
             </v-card-text>
           </v-card>
 
@@ -89,8 +89,10 @@ import { ref, computed, watchEffect } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplay } from 'vuetify'
 import { useRouter } from 'vue-router'
+import { useAuth0 } from '@auth0/auth0-vue'
 
 const auth = useAuthStore()
+const auth0 = useAuth0()
 const { name } = useDisplay()
 const router = useRouter()
 
@@ -123,7 +125,7 @@ watchEffect(() => {
 })
 
 const handleLogout = async () => {
-  await auth.logout()
+  await auth.logout(auth0)
   router.push('/')
 }
 </script>

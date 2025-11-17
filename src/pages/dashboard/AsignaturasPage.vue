@@ -5,7 +5,7 @@
       Le decimos a Vue: "Si el rol es 'Estudiante', muestra el componente
       de Estudiante. Si no, muestra el componente de Admin (Malla Curricular)."
     -->
-    <estudiante-asignaturas v-if="auth.user.role === 'Estudiante'" />
+    <estudiante-asignaturas v-if="auth.user?.role === 'Estudiante'" />
     <admin-asignaturas v-else />
   </div>
 </template>

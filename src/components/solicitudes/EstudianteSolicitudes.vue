@@ -78,7 +78,7 @@ const buildInitialRequests = () =>
     .filter((request) => request.studentName === DEFAULT_STUDENT_NAME)
     .map((request) => {
       const cloned = cloneRequest(request)
-      cloned.studentName = auth.user.name ?? DEFAULT_STUDENT_NAME
+      cloned.studentName = auth.user?.name ?? DEFAULT_STUDENT_NAME
       return cloned
     })
 
@@ -114,14 +114,14 @@ const selectedRequest = computed<Request | null>(() => {
 })
 
 const currentUser = computed<User>(() => ({
-  id: auth.user.email ?? 'estudiante@ufro.cl',
-  name: auth.user.name ?? 'Estudiante UFRO',
-  email: auth.user.email ?? 'estudiante@ufro.cl',
+  id: auth.user?.email ?? 'estudiante@ufro.cl',
+  name: auth.user?.name ?? 'Estudiante UFRO',
+  email: auth.user?.email ?? 'estudiante@ufro.cl',
   role: UserRole.STUDENT,
 }))
 
 watch(
-  () => auth.user.name,
+  () => auth.user?.name,
   (newName) => {
     if (!newName) return
 

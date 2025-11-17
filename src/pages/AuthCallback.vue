@@ -98,7 +98,7 @@ async function handleAlreadyProcessedSession() {
   const effectiveToken = accessToken ?? session.idToken
   auth.setSessionFromAuth0(session.user, effectiveToken)
 
-  const roleRoute = resolveRouteForRole(auth.user.role)
+  const roleRoute = resolveRouteForRole(auth.user?.role ?? null)
   const targetRoute = roleRoute ?? FALLBACK_ROUTE
 
   await router.replace(targetRoute)
@@ -123,7 +123,7 @@ onMounted(async () => {
 
     auth.setSessionFromAuth0(session.user, effectiveToken)
 
-    const roleRoute = resolveRouteForRole(auth.user.role)
+    const roleRoute = resolveRouteForRole(auth.user?.role ?? null)
     const targetRoute =
       (appState?.returnTo as string | undefined) ?? roleRoute ?? FALLBACK_ROUTE
 
