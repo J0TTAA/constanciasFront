@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteMeta } from 'vue-router' // 1. IMPORTAMOS RouteMeta
 import { useAuthStore } from '@/stores/auth'
 import DashboardLayout from '@/components/layouts/DashboardLayout.vue'
 
@@ -69,36 +68,35 @@ const router = createRouter({
 })
 
 // --- GUARDIA DE NAVEGACIÓN (VERSIÓN CORREGIDA) ---
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
 
-  // Guardamos los valores en variables para más claridad
-  const isLoggedIn = auth.isLoggedIn
-  const userRole = auth.user.role // Esto es 'string | null'
-  const targetRoles = to.meta.roles // Esto es 'string[] | undefined'
+  // 🔵 Garantiza que el store haya terminado de cargar
+  if (!auth.initialized) {
+    await auth.loadFromStorage()
+  }
 
-  // --- 1. ¿La ruta requiere autenticación? ---
+  const isLoggedIn = auth.isLoggedIn
+  const userRole = auth.user?.role || null
+  const targetRoles = to.meta.roles
+
+  // --- 1. Rutas que requieren login ---
   if (to.meta.requiresAuth && !isLoggedIn) {
-    // Si la requiere Y NO está logueado, lo mandamos al login
     return next({ name: 'login' })
   }
 
+  // --- 2. Usuario ya logueado intentando ir al login ---
   if (to.name === 'login' && isLoggedIn) {
     return next({ name: 'dashboard-solicitudes' })
   }
 
-  // --- 2. ¿La ruta requiere roles? ---
-  // Si la ruta define 'roles' Y el usuario TIENE un 'rol'
+  // --- 3. Validación de roles ---
   if (targetRoles && userRole) {
-    // TypeScript ahora sabe que userRole NO es null aquí
     if (!targetRoles.includes(userRole)) {
-      // Si el usuario tiene un rol, pero NO es el correcto...
-      // lo mandamos a la página principal del dashboard
       return next({ name: 'dashboard-solicitudes' })
     }
   }
 
-  // --- 3. Si todo está bien, dejamos que continúe ---
   next()
 })
 
