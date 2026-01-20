@@ -89,10 +89,8 @@ import { ref, computed, watchEffect } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplay } from 'vuetify'
 import { useRouter } from 'vue-router'
-import { useAuth0 } from '@auth0/auth0-vue'
 
 const auth = useAuthStore()
-const auth0 = useAuth0()
 const { name } = useDisplay()
 const router = useRouter()
 
@@ -125,7 +123,7 @@ watchEffect(() => {
 })
 
 const handleLogout = async () => {
-  await auth.logout(auth0)
+  await auth.logout()
   router.push('/')
 }
 </script>

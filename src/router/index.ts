@@ -23,12 +23,6 @@ const router = createRouter({
       meta: { requiresAuth: false }, // No requiere auth para ver el login
     },
     {
-      path: '/auth/callback',
-      name: 'auth-callback',
-      component: () => import('@/pages/AuthCallback.vue'),
-      meta: { requiresAuth: false },
-    },
-    {
       // --- RUTA PADRE "DASHBOARD" ---
       path: '/dashboard',
       component: DashboardLayout, // Carga el "cascarón"
