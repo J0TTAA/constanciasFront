@@ -198,11 +198,14 @@ const handleViewDocument = async () => {
   documentUrl.value = null
 
   try {
-    // Usar el endpoint de previsualización que devuelve PDF
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/previsualizar`
-      : `http://localhost:3020/api/v1/constancias/documento/${props.request.id}/previsualizar`
+      : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/previsualizar`
     
     console.log('📄 [Documento] Obteniendo previsualización PDF del backend...')
     console.log('   Endpoint:', endpoint)
@@ -545,11 +548,14 @@ const handleDownloadOriginal = async () => {
   isDownloadingDocument.value = true
 
   try {
-    // Usar el endpoint de descarga que devuelve el DOCX original
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/descargar`
-      : `http://localhost:3020/api/v1/constancias/documento/${props.request.id}/descargar`
+      : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/descargar`
     
     console.log('📥 [Descarga] Descargando documento original (DOCX)...')
     console.log('   Endpoint:', endpoint)

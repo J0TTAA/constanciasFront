@@ -261,11 +261,14 @@ const fetchRequests = async () => {
   requestsError.value = null
 
   try {
-    // Usar proxy de Vite en desarrollo para evitar CORS
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? '/api/v1/constancias/todas/estado'
-      : 'http://localhost:3020/api/v1/constancias/todas/estado'
+      : `${apiUrl}/api/v1/constancias/todas/estado`
     
     console.log('📥 [Admin Solicitudes] Obteniendo todas las solicitudes del backend...')
     console.log('   Endpoint:', endpoint)

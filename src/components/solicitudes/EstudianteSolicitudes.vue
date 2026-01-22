@@ -195,11 +195,14 @@ const fetchRequests = async () => {
   requestsError.value = null
 
   try {
-    // Usar proxy de Vite en desarrollo para evitar CORS
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
     const endpoint = isDevelopment
       ? '/api/v1/constancias/mis/estado'
-      : 'http://localhost:3020/api/v1/constancias/mis/estado'
+      : `${apiUrl}/api/v1/constancias/mis/estado`
     
     console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
     console.log('   Endpoint:', endpoint)
@@ -410,11 +413,14 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
   }
 
   try {
-    // Usar proxy de Vite en desarrollo para evitar CORS
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
     const endpoint = isDevelopment
       ? '/api/v1/constancias/solicitar'
-      : 'http://localhost:3020/api/v1/constancias/solicitar'
+      : `${apiUrl}/api/v1/constancias/solicitar`
     
     console.log('📤 [Nueva Solicitud] Enviando solicitud al backend...')
     console.log('   Tipo de constancia:', solicitudBody.nombreTipoConstancia)
@@ -546,14 +552,14 @@ const handleTestEndpoint = async () => {
   isTestingEndpoint.value = true
 
   try {
-    // ⚠️ IMPORTANTE: Usar proxy de Vite en desarrollo para evitar CORS
-    // El proxy redirige /api/v1/constancias/* a http://localhost:3020/api/v1/constancias/*
-    // Esto evita problemas de CORS durante desarrollo
-    // En producción, el backend DEBE tener CORS configurado
+    // Usar variable de entorno para la URL del backend
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
+    
+    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
-      : 'http://localhost:3020/api/v1/constancias/solicitar' // URL completa en producción
+      : `${apiUrl}/api/v1/constancias/solicitar` // URL completa en producción
     
     // Body completo para "Alumno Regular" según los ejemplos proporcionados
     const body = {
@@ -637,7 +643,8 @@ const handleTestEndpoint = async () => {
     console.log('   Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   URL relativa:', endpoint)
     if (isDevelopment) {
-      console.log('   URL completa (proxy redirige a):', 'http://localhost:3020' + endpoint)
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+      console.log('   URL completa (proxy redirige a):', apiUrl + endpoint)
     } else {
       console.log('   URL completa:', endpoint)
     }
@@ -693,7 +700,8 @@ const handleTestEndpoint = async () => {
     })
     console.log('   Comparación con Postman:')
     console.log('     - URL:', isDevelopment ? '✅ Relativa (proxy redirige)' : '✅ Completa')
-    console.log('     - URL destino:', isDevelopment ? 'http://localhost:3020' + endpoint : endpoint)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    console.log('     - URL destino:', isDevelopment ? apiUrl + endpoint : endpoint)
     console.log('     - Method: ✅ POST')
     console.log('     - Body: ✅ Correcto')
     console.log('     - Authorization header: ✅ Bearer token presente')

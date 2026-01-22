@@ -13,13 +13,26 @@ Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
 ```bash
 # URLs para la VM (ajusta según tu configuración)
-VITE_SUPABASE_URL=http://tu-dominio.com/auth/v1
+# IMPORTANTE: VITE_API_URL debe ser la URL BASE del backend, sin el path /api/v1
+# El código agrega automáticamente /api/v1/constancias a esta URL
+
+# Desarrollo local:
+VITE_SUPABASE_URL=http://localhost:8000
+VITE_API_URL=http://localhost:3020
+
+# Producción en VM con Nginx:
+# VITE_SUPABASE_URL=http://tu-dominio.com/auth/v1
+# VITE_API_URL=http://tu-dominio.com  (Nginx redirige /api/v1/constancias al backend)
+
+# Claves de Supabase
 VITE_SUPABASE_ANON_KEY=tu_anon_key_aqui
-VITE_API_URL=http://tu-dominio.com/api/v1
 VITE_ANON_KEY=tu_anon_key_aqui
 ```
 
-**Nota:** En la VM, las URLs deben apuntar a través del Nginx principal, no directamente a los puertos internos.
+**Nota:** 
+- En la VM, las URLs deben apuntar a través del Nginx principal, no directamente a los puertos internos.
+- `VITE_API_URL` es la URL base del backend. El código agrega automáticamente `/api/v1/constancias` a esta URL.
+- En desarrollo, el proxy de Vite redirige `/api/v1/constancias` a `http://localhost:3020/api/v1/constancias`.
 
 ## Construcción y Ejecución
 
