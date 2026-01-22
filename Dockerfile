@@ -1,6 +1,6 @@
 # -------- ETAPA 1: BUILD (Construcción) --------
-# Usamos una imagen ligera de Node.js (Alpine es una versión mínima)
-FROM node:20-alpine AS builder
+# Usamos una imagen ligera de Node.js 18 (según package.json)
+FROM node:18-alpine AS builder
 
 # Establecemos el directorio de trabajo dentro del contenedor
 WORKDIR /app
@@ -12,6 +12,18 @@ RUN npm install
 
 # Copiamos el resto del código fuente del proyecto
 COPY . .
+
+# Variables de entorno para el build (Vite necesita VITE_* en tiempo de build)
+# Estas se pueden pasar con --build-arg o desde docker-compose
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_API_URL
+ARG VITE_ANON_KEY
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_ANON_KEY=$VITE_ANON_KEY
 
 # Ejecutamos el script de build de Vue (que crea la carpeta /dist)
 RUN npm run build

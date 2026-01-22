@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Variables de entorno para el build (Vite necesita estas en tiempo de build)
+        # IMPORTANTE: Estas variables se inyectan en tiempo de build, no en runtime
+        # En la VM, estas URLs deben apuntar a través del Nginx principal
+        # Ejemplo: Si tu dominio es ejemplo.com, usa:
+        # - VITE_SUPABASE_URL: http://ejemplo.com/auth/v1 (o https://ejemplo.com/auth/v1)
+        # - VITE_API_URL: http://ejemplo.com/api/v1 (o https://ejemplo.com/api/v1)
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:8000}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3020}
+        VITE_ANON_KEY: ${VITE_ANON_KEY:-}
+    container_name: constancias-frontend
+    ports:
+      - "3000:80"
+    # No montar nginx.conf como volumen ya que la VM tiene su propio Nginx
+    # El contenedor solo sirve archivos estáticos
+    restart: unless-stopped
+    networks:
+      - constancias-network
+    # Si el backend está en otro contenedor, descomenta depends_on
+    # depends_on:
+    #   - backend
+
+  # Backend de constancias (descomenta y ajusta según tu configuración)
+  # Si tu backend está en otro repositorio, puedes usar una imagen externa
+  # backend:
+  #   image: tu-backend-image:latest
+  #   # O build desde otro directorio:
+  #   # build:
+  #   #   context: ../constanciasBackend
+  #   #   dockerfile: Dockerfile
+  #   container_name: constancias-backend
+  #   ports:
+  #     - "3020:3020"
+  #   environment:
+  #     - SUPABASE_URL=${SUPABASE_URL:-http://localhost:8000}
+  #     - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+  #     - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+  #   networks:
+  #     - constancias-network
+
+networks:
+  constancias-network:
+    driver: bridge
+
