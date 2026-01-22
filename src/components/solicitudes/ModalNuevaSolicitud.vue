@@ -32,15 +32,43 @@
           <!--
             v-textarea para las Observaciones
           -->
+          <v-label class="font-weight-medium mb-1 mt-3">Género</v-label>
+          <v-radio-group v-model="genero" inline :rules="[rules.required]" class="mb-4">
+            <v-radio label="Masculino" value="masculino"></v-radio>
+            <v-radio label="Femenino" value="femenino"></v-radio>
+          </v-radio-group>
+
+          <!-- Campos específicos para "Inscripción Asignaturas" -->
+          <template v-if="tipoConstancia === 'Inscripción Asignaturas'">
+            <v-label class="font-weight-medium mb-1">Semestre</v-label>
+            <v-text-field
+              v-model="semestre"
+              variant="outlined"
+              placeholder="Ej: Primer Semestre de 2025"
+              hint="Ejemplo: Primer Semestre de 2025"
+              persistent-hint
+              class="mb-3"
+            ></v-text-field>
+
+            <v-label class="font-weight-medium mb-1">Propósito</v-label>
+            <v-text-field
+              v-model="proposito"
+              variant="outlined"
+              placeholder="Ej: gestionar la renovación de su Beca Doctorado Nacional de ANID"
+              hint="Motivo de la solicitud de la constancia"
+              persistent-hint
+              class="mb-3"
+            ></v-text-field>
+          </template>
+
           <v-label class="font-weight-medium mb-1 mt-3">Observaciones</v-label>
           <v-textarea
             v-model="observaciones"
             variant="outlined"
             placeholder="Ej: Necesito esta constancia para postular a una beca. Por favor, indicar el semestre actual."
             rows="4"
-            hint="Este campo es requerido. Sea claro/a con su necesidad."
+            hint="Este campo es opcional. Sea claro/a con su necesidad."
             persistent-hint
-            :rules="[rules.required]"
           ></v-textarea>
         </v-form>
       </v-card-text>
@@ -66,26 +94,138 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 // --- Props y Emits para el v-model ---
 // Esto permite que el componente padre controle si el modal está visible
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits(['update:modelValue', 'submit'])
 
+const auth = useAuthStore()
+
 // --- Estado Interno del Formulario ---
 const form = ref<any>(null) // Referencia al v-form
 const tipoConstancia = ref<string | null>(null)
+const genero = ref<"masculino" | "femenino" | null>(null)
 const observaciones = ref('')
+const semestre = ref('')
+const proposito = ref('')
 const isLoading = ref(false)
 
 // Opciones del v-select
 const tiposDeConstancia = [
   'Alumno Regular',
-  'Notas',
-  'Rendición de Examen de Calificación',
-  'Asignaturas Inscritas',
+  'Examen',
+  'Inscripción Asignaturas',
 ]
+
+// Configuración de bodies según las especificaciones del backend
+const constanciaBodies = {
+  'Alumno Regular': {
+    base: {
+      nombreTipoConstancia: 'Alumno Regular',
+    },
+    masculino: {
+      titulo1: 'El',
+      titulo3: 'alumno',
+      semestre: 'Primer Semestre 2026',
+      proposito: 'trámites universitarios',
+    },
+    femenino: {
+      titulo1: 'La',
+      titulo3: 'alumna',
+      semestre: 'Primer Semestre 2026',
+      proposito: 'trámites universitarios',
+    },
+  },
+  'Examen': {
+    base: {
+      nombreTipoConstancia: 'Examen',
+    },
+    masculino: {
+      titulo1: 'El',
+      titulo3: 'alumno',
+      titulo4: 'del',
+      proposito: 'postular a la Beca Doctorado Nacional ANID',
+    },
+    femenino: {
+      titulo1: 'la Srta.',
+      titulo3: 'alumna',
+      titulo4: 'de la',
+      proposito: 'postular a la Beca Doctorado Nacional ANID',
+    },
+  },
+  'Inscripción Asignaturas': {
+    base: {
+      nombreTipoConstancia: 'Inscripción Asignaturas',
+      semestre: 'Primer Semestre de 2025',
+      proposito: 'gestionar la renovación de su Beca Doctorado Nacional de ANID',
+    },
+    masculino: {
+      titulo1: 'El',
+      titulo2: 'Sr.',
+      titulo3: 'alumno',
+      titulo4: 'del',
+      titulo5: 'interesado',
+    },
+    femenino: {
+      titulo1: 'La',
+      titulo2: 'Srta.',
+      titulo3: 'alumna',
+      titulo4: 'de la',
+      titulo5: 'interesada',
+    },
+  },
+}
+
+const solicitudBody = computed(() => {
+  if (!tipoConstancia.value || !genero.value) return null
+
+  const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
+  const generoSpecificBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies][genero.value]
+
+  // Construir el body según las especificaciones del backend
+  // Nota: El backend puede obtener rutAlumno del token JWT, pero lo incluimos por si acaso
+  const finalBody: Record<string, any> = {
+    nombreTipoConstancia: baseBody.nombreTipoConstancia,
+    ...generoSpecificBody,
+  }
+
+  // Agregar observacionAlumno si el usuario la proporcionó
+  if (observaciones.value.trim()) {
+    finalBody.observacionAlumno = observaciones.value.trim()
+  }
+
+  // Agregar campos base que no son específicos de género (como semestre y proposito para Inscripción Asignaturas)
+  if (baseBody.semestre) {
+    finalBody.semestre = baseBody.semestre
+  }
+  if (baseBody.proposito) {
+    finalBody.proposito = baseBody.proposito
+  }
+
+  // Si el género ya tiene semestre o proposito, usar esos (sobrescribir)
+  if (generoSpecificBody.semestre) {
+    finalBody.semestre = generoSpecificBody.semestre
+  }
+  if (generoSpecificBody.proposito) {
+    finalBody.proposito = generoSpecificBody.proposito
+  }
+
+  // Si el usuario ingresó valores personalizados para "Inscripción Asignaturas", usar esos
+  if (tipoConstancia.value === 'Inscripción Asignaturas') {
+    if (semestre.value.trim()) {
+      finalBody.semestre = semestre.value.trim()
+    }
+    if (proposito.value.trim()) {
+      finalBody.proposito = proposito.value.trim()
+    }
+  }
+
+  return finalBody
+})
+
 
 // Reglas de validación
 const rules = {
@@ -102,21 +242,19 @@ const submitForm = async () => {
   const { valid } = await form.value.validate()
   if (!valid) return
 
-  isLoading.value = true
+  if (!solicitudBody.value) {
+    console.error('❌ [Modal] No se pudo generar el body de la solicitud')
+    return
+  }
 
-  // 2. Simular envío (aquí iría la llamada a la API)
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  // 2. Emitir el evento 'submit' con los datos (la llamada a la API se hace en el componente padre)
+  emit('submit', solicitudBody.value)
 
-  // 3. Emitir el evento 'submit' con los datos
-  emit('submit', {
-    tipo: tipoConstancia.value,
-    observaciones: observaciones.value,
-  })
-
-  // 4. Limpiar y cerrar
-  isLoading.value = false
+  // 3. Limpiar campos (el modal se cerrará desde el componente padre después de la respuesta)
   tipoConstancia.value = null
+  genero.value = null
   observaciones.value = ''
-  close()
+  semestre.value = ''
+  proposito.value = ''
 }
 </script>

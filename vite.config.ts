@@ -18,7 +18,7 @@ export default defineConfig({
   // ⚠️ PROXY SOLO PARA DESARROLLO - NO ES LA SOLUCIÓN DEFINITIVA
   // Esto evita CORS en desarrollo, pero en producción el backend DEBE tener CORS configurado
   server: {
-    host: '127.0.0.1', // Usar IPv4 en lugar de IPv6 para evitar problemas de permisos
+    host: 'localhost', // Usar localhost para consistencia con el backend
     port: 3000, // Cambiado a 3000 para evitar problemas de permisos en Windows
     proxy: {
       // Proxy para el backend de constancias (puerto 3020)

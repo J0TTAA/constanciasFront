@@ -11,6 +11,19 @@
           Nueva Solicitud
         </v-btn>
         
+        <!-- Botón para recargar solicitudes -->
+        <v-btn
+          color="secondary"
+          variant="outlined"
+          size="small"
+          prepend-icon="mdi-refresh"
+          :loading="isLoadingRequests"
+          :disabled="isLoadingRequests || !auth.token"
+          @click="fetchRequests"
+        >
+          Actualizar
+        </v-btn>
+        
         <!-- Botón de prueba para endpoint -->
         <v-btn
           color="secondary"
@@ -26,7 +39,12 @@
       </div>
 
       <v-card class="rounded-lg" variant="outlined" color="#e0e0e0">
-        <v-data-table :headers="headers" :items="tableItems" class="rounded-lg">
+        <v-data-table 
+          :headers="headers" 
+          :items="tableItems" 
+          :loading="isLoadingRequests"
+          class="rounded-lg"
+        >
           <template v-slot:[`item.estado`]="{ value }">
             <v-chip
               :color="getStatusColor(value)"
@@ -50,7 +68,11 @@
           </template>
 
           <template #no-data>
-            <p class="pa-4 text-center">No tienes ninguna solicitud creada.</p>
+            <div class="pa-4 text-center">
+              <p v-if="isLoadingRequests">Cargando solicitudes...</p>
+              <p v-else-if="requestsError">{{ requestsError }}</p>
+              <p v-else>No tienes ninguna solicitud creada.</p>
+            </div>
           </template>
         </v-data-table>
       </v-card>
@@ -69,34 +91,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import RequestDetail from './RequestDetail.vue'
 import ModalNuevaSolicitud from './ModalNuevaSolicitud.vue'
 import { RequestStatus, UserRole } from '@/types/requestTypes'
 import type { Request, User } from '@/types/requestTypes'
-import { mockRequests } from '@/mocks/requests'
 
 const auth = useAuthStore()
 
-const cloneRequest = (request: Request): Request => ({
-  ...request,
-  history: request.history.map((entry) => ({ ...entry })),
-})
-
-const DEFAULT_STUDENT_NAME = 'Ana Contreras'
-
-const buildInitialRequests = () =>
-  mockRequests
-    .filter((request) => request.studentName === DEFAULT_STUDENT_NAME)
-    .map((request) => {
-      const cloned = cloneRequest(request)
-      cloned.studentName = auth.user?.name ?? DEFAULT_STUDENT_NAME
-      return cloned
-    })
-
-const requests = ref<Request[]>(buildInitialRequests())
+const requests = ref<Request[]>([])
+const isLoadingRequests = ref(false)
+const requestsError = ref<string | null>(null)
 
 const selectedRequestId = ref<string | null>(null)
 
@@ -135,15 +142,169 @@ const currentUser = computed<User>(() => ({
   role: UserRole.STUDENT,
 }))
 
-watch(
-  () => auth.user?.name,
-  (newName) => {
-    if (!newName) return
+// Función para mapear el estado del backend al RequestStatus del frontend
+const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus => {
+  // Normalizar el estado a mayúsculas para comparación
+  const normalizedStatus = backendStatus.toUpperCase().trim()
+  
+  const statusMap: Record<string, RequestStatus> = {
+    // Estados en mayúsculas (formato del backend)
+    'SOLICITADA': RequestStatus.REQUESTED,
+    'EN REVISIÓN': RequestStatus.IN_REVIEW,
+    'EN REVISION': RequestStatus.IN_REVIEW,
+    'PARA FIRMA': RequestStatus.AWAITING_SIGNATURE,
+    'FIRMADO Y DISPONIBLE': RequestStatus.SIGNED,
+    'FIRMADO': RequestStatus.SIGNED,
+    'RECHAZADO': RequestStatus.REJECTED,
+    // Estados en formato normal (por si acaso)
+    'Solicitado': RequestStatus.REQUESTED,
+    'Solicitada': RequestStatus.REQUESTED,
+    'En Revisión': RequestStatus.IN_REVIEW,
+    'En Revision': RequestStatus.IN_REVIEW,
+    'Para Firma': RequestStatus.AWAITING_SIGNATURE,
+    'Firmado y Disponible': RequestStatus.SIGNED,
+    'Firmado': RequestStatus.SIGNED,
+    'Rechazado': RequestStatus.REJECTED,
+    // También manejar posibles valores en inglés o otros formatos
+    'REQUESTED': RequestStatus.REQUESTED,
+    'IN_REVIEW': RequestStatus.IN_REVIEW,
+    'AWAITING_SIGNATURE': RequestStatus.AWAITING_SIGNATURE,
+    'SIGNED': RequestStatus.SIGNED,
+    'REJECTED': RequestStatus.REJECTED,
+  }
+  
+  return statusMap[normalizedStatus] || RequestStatus.REQUESTED
+}
 
-    requests.value = requests.value.map((request) => ({
-      ...request,
-      studentName: newName,
-    }))
+// Función para obtener las solicitudes del backend
+const fetchRequests = async () => {
+  // Verificar que el store esté inicializado
+  if (!auth.initialized) {
+    await auth.loadFromStorage()
+  }
+
+  const tokenFromStore = auth.token
+  
+  if (!tokenFromStore) {
+    console.error('❌ No hay token disponible para obtener las solicitudes')
+    requestsError.value = 'No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.'
+    return
+  }
+
+  isLoadingRequests.value = true
+  requestsError.value = null
+
+  try {
+    // Usar proxy de Vite en desarrollo para evitar CORS
+    const isDevelopment = import.meta.env.DEV
+    const endpoint = isDevelopment
+      ? '/api/v1/constancias/mis/estado'
+      : 'http://localhost:3020/api/v1/constancias/mis/estado'
+    
+    console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
+    console.log('   Endpoint:', endpoint)
+
+    // Limpiar el token de espacios
+    const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cleanToken}`,
+      },
+    })
+
+    console.log('📥 [Solicitudes] Respuesta recibida:')
+    console.log('   Status:', response.status, response.statusText)
+    console.log('   OK:', response.ok)
+
+    if (!response.ok) {
+      let errorText = ''
+      let errorData: any = null
+      
+      try {
+        errorText = await response.text()
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
+      } catch (e) {
+        errorText = 'No se pudo leer el cuerpo de la respuesta'
+        errorData = { message: errorText }
+      }
+
+      console.error('❌ [Solicitudes] Error al obtener las solicitudes:')
+      console.error('   Status:', response.status)
+      console.error('   Error:', JSON.stringify(errorData, null, 2))
+
+      const errorMessage = errorData.message || errorData.msg || `Error ${response.status}: ${response.statusText}`
+      requestsError.value = `Error al cargar las solicitudes: ${errorMessage}`
+      return
+    }
+
+    // Leer la respuesta exitosa
+    const responseData = await response.json()
+    console.log('✅ [Solicitudes] Solicitudes obtenidas exitosamente:')
+    console.log('   Respuesta:', JSON.stringify(responseData, null, 2))
+
+    // Mapear la respuesta del backend al formato Request
+    // El backend devuelve un array directamente
+    const backendRequests = Array.isArray(responseData) 
+      ? responseData 
+      : (responseData.data || responseData.solicitudes || [])
+
+    const mappedRequests: Request[] = backendRequests.map((item: any, index: number) => {
+      // Mapear los campos del backend al formato Request según la estructura real:
+      // { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual }
+      const request: Request = {
+        id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
+        type: item.tipoConstancia || 'N/A',
+        studentName: auth.user?.name || 'Estudiante',
+        studentId: auth.user?.email || 'N/A',
+        requestDate: item.fechaSolicitud || new Date().toISOString(),
+        lastUpdateDate: item.fechaActualizacion || item.fechaSolicitud || new Date().toISOString(),
+        status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+        observations: item.observacionAlumno || item.observaciones || '',
+        history: [
+          {
+            id: `${item.idSolicitud || index}-1`,
+            date: item.fechaSolicitud || new Date().toISOString(),
+            user: auth.user?.name || 'Estudiante',
+            status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+            observation: item.observacionAlumno || item.observaciones || 'Solicitud creada.',
+          },
+        ],
+        fileUrl: item.urlArchivo || item.fileUrl || item.documentoUrl || undefined,
+      }
+
+      return request
+    })
+
+    requests.value = mappedRequests
+    console.log(`✅ [Solicitudes] ${mappedRequests.length} solicitudes cargadas`)
+
+  } catch (error) {
+    console.error('❌ [Solicitudes] Error al obtener las solicitudes:', error)
+    requestsError.value = `Error al cargar las solicitudes: ${error instanceof Error ? error.message : 'Error desconocido'}`
+  } finally {
+    isLoadingRequests.value = false
+  }
+}
+
+// Cargar las solicitudes cuando el componente se monte
+onMounted(async () => {
+  await fetchRequests()
+})
+
+// Recargar las solicitudes cuando el usuario cambie
+watch(
+  () => auth.user?.email,
+  async (newEmail) => {
+    if (newEmail) {
+      await fetchRequests()
+    }
   },
   { immediate: false },
 )
@@ -224,31 +385,126 @@ const getStatusIcon = (estado: string) => {
   }
 }
 
-const handleNuevaSolicitud = (formData: { tipo: string; observaciones: string }) => {
-  const newId = `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
-
-  const newRequest: Request = {
-    id: newId,
-    type: formData.tipo,
-    studentName: currentUser.value.name,
-    studentId: '20.123.456-7',
-    requestDate: new Date().toISOString(),
-    lastUpdateDate: new Date().toISOString(),
-    status: RequestStatus.REQUESTED,
-    observations: formData.observaciones,
-    history: [
-      {
-        id: `${newId}-1`,
-        date: new Date().toISOString(),
-        user: currentUser.value.name,
-        status: RequestStatus.REQUESTED,
-        observation: formData.observaciones || 'Solicitud creada.',
-      },
-    ],
+const handleNuevaSolicitud = async (solicitudBody: any) => {
+  // Verificar que el store esté inicializado
+  if (!auth.initialized) {
+    await auth.loadFromStorage()
   }
 
-  requests.value = [newRequest, ...requests.value]
-  showModal.value = false
+  // Obtener el token del store
+  const tokenFromStore = auth.token
+  
+  if (!tokenFromStore) {
+    console.error('❌ No hay token disponible en el store')
+    alert('Error: No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.')
+    return
+  }
+
+  // Limpiar el token de espacios y caracteres extra
+  const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
+  
+  if (!cleanToken || !cleanToken.startsWith('eyJ')) {
+    console.error('❌ Token vacío o inválido')
+    alert('Error: Token de autenticación inválido. Por favor, inicia sesión nuevamente.')
+    return
+  }
+
+  try {
+    // Usar proxy de Vite en desarrollo para evitar CORS
+    const isDevelopment = import.meta.env.DEV
+    const endpoint = isDevelopment
+      ? '/api/v1/constancias/solicitar'
+      : 'http://localhost:3020/api/v1/constancias/solicitar'
+    
+    console.log('📤 [Nueva Solicitud] Enviando solicitud al backend...')
+    console.log('   Tipo de constancia:', solicitudBody.nombreTipoConstancia)
+    console.log('   Endpoint:', endpoint)
+    console.log('   Body:', JSON.stringify(solicitudBody, null, 2))
+
+    // Headers con el token
+    const requestHeaders: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${cleanToken}`,
+    }
+
+    // Hacer la petición
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(solicitudBody),
+    })
+
+    console.log('📥 [Nueva Solicitud] Respuesta recibida:')
+    console.log('   Status:', response.status, response.statusText)
+    console.log('   OK:', response.ok)
+
+    if (!response.ok) {
+      // Intentar leer el error
+      let errorText = ''
+      let errorData: any = null
+      
+      try {
+        errorText = await response.text()
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
+      } catch (e) {
+        errorText = 'No se pudo leer el cuerpo de la respuesta'
+        errorData = { message: errorText }
+      }
+
+      console.error('❌ [Nueva Solicitud] Error en la respuesta:')
+      console.error('   Status:', response.status)
+      console.error('   Error:', JSON.stringify(errorData, null, 2))
+
+      const errorMessage = errorData.message || errorData.msg || `Error ${response.status}: ${response.statusText}`
+      alert(`Error al crear la solicitud:\n\n${errorMessage}`)
+      return
+    }
+
+    // Leer la respuesta exitosa
+    const responseData = await response.json()
+    console.log('✅ [Nueva Solicitud] Solicitud creada exitosamente:')
+    console.log('   Respuesta:', JSON.stringify(responseData, null, 2))
+
+    // Crear la solicitud local para mostrar en la tabla
+    const newId = responseData.id || `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
+
+    const newRequest: Request = {
+      id: newId,
+      type: solicitudBody.nombreTipoConstancia,
+      studentName: currentUser.value.name,
+      studentId: auth.user?.email || 'N/A',
+      requestDate: new Date().toISOString(),
+      lastUpdateDate: new Date().toISOString(),
+      status: RequestStatus.REQUESTED,
+      observations: solicitudBody.observacionAlumno || '',
+      history: [
+        {
+          id: `${newId}-1`,
+          date: new Date().toISOString(),
+          user: currentUser.value.name,
+          status: RequestStatus.REQUESTED,
+          observation: solicitudBody.observacionAlumno || 'Solicitud creada.',
+        },
+      ],
+    }
+
+    // Recargar las solicitudes desde el backend para obtener la versión actualizada
+    await fetchRequests()
+    
+    // Cerrar el modal después de éxito
+    showModal.value = false
+
+    // Mostrar mensaje de éxito (opcional, puedes usar un snackbar en lugar de alert)
+    console.log('✅ Solicitud creada exitosamente')
+
+  } catch (error) {
+    console.error('❌ [Nueva Solicitud] Error al hacer la petición:', error)
+    alert(`Error al crear la solicitud:\n\n${error instanceof Error ? error.message : 'Error desconocido'}`)
+  }
 }
 
 const handleTestEndpoint = async () => {
@@ -299,8 +555,15 @@ const handleTestEndpoint = async () => {
       ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
       : 'http://localhost:3020/api/v1/constancias/solicitar' // URL completa en producción
     
+    // Body completo para "Alumno Regular" según los ejemplos proporcionados
     const body = {
+      rutAlumno: auth.user?.email || 'TU_RUT_AQUI',
       nombreTipoConstancia: 'Alumno Regular',
+      observacionAlumno: 'Solicito constancia para trámites universitarios.',
+      titulo1: 'El',
+      titulo3: 'alumno',
+      semestre: 'Primer Semestre 2026',
+      proposito: 'trámites universitarios',
     }
 
     // Limpiar el token de espacios y caracteres extra (múltiples espacios, saltos de línea, etc.)

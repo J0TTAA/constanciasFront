@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
+    "docx-preview": "^0.3.7",
     "jwt-decode": "^4.0.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.22",
