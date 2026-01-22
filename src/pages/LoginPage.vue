@@ -154,6 +154,11 @@ const login = async () => {
     const apiUrl = import.meta.env.VITE_SUPABASE_URL || 'http://localhost:8000'
     const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
     
+    // 📋 Logs de configuración de Supabase
+    console.log('🔐 [Login] Configuración de Supabase:')
+    console.log('   - VITE_SUPABASE_URL:', apiUrl)
+    console.log('   - VITE_SUPABASE_ANON_KEY:', anonKey ? '✅ Definida' : '❌ No definida')
+    
     if (!apiUrl) {
       throw new Error('VITE_SUPABASE_URL no está configurado en el archivo .env')
     }
@@ -163,6 +168,7 @@ const login = async () => {
     }
     
     const loginEndpoint = `${apiUrl}/auth/v1/token?grant_type=password`
+    console.log('   - Endpoint completo:', loginEndpoint)
     const loginBody = {
       email: email.value,
       password: password.value,

@@ -199,13 +199,21 @@ const fetchRequests = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
     
+    // 📋 Logs de configuración del backend API
+    console.log('🔌 [Solicitudes] Configuración del Backend API:')
+    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
+    console.log('   - URL base del backend:', apiUrl)
+    
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
     const endpoint = isDevelopment
       ? '/api/v1/constancias/mis/estado'
       : `${apiUrl}/api/v1/constancias/mis/estado`
     
     console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
-    console.log('   Endpoint:', endpoint)
+    console.log('   - Endpoint relativo:', '/api/v1/constancias/mis/estado')
+    console.log('   - Endpoint completo:', endpoint)
+    console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
 
     // Limpiar el token de espacios
     const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
@@ -414,13 +422,39 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
 
   try {
     // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
-    const isDevelopment = import.meta.env.DEV
+    // Asegurar que siempre haya un valor válido
+    let rawApiUrl: string | undefined
+    try {
+      rawApiUrl = import.meta.env.VITE_API_URL
+    } catch (e) {
+      console.warn('⚠️ No se pudo leer VITE_API_URL:', e)
+      rawApiUrl = undefined
+    }
+    
+    // Validar y limpiar la URL del API
+    const apiUrl: string = (rawApiUrl && typeof rawApiUrl === 'string' && rawApiUrl.trim() !== '') 
+      ? rawApiUrl.trim() 
+      : 'http://localhost:3020'
+    
+    const isDevelopment = import.meta.env.DEV || false
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
-    const endpoint = isDevelopment
-      ? '/api/v1/constancias/solicitar'
-      : `${apiUrl}/api/v1/constancias/solicitar`
+    // Asegurar que el endpoint siempre tenga un valor válido
+    let endpoint: string
+    if (isDevelopment) {
+      endpoint = '/api/v1/constancias/solicitar'
+    } else {
+      // Validar que apiUrl esté definida antes de usarla
+      if (!apiUrl || apiUrl.trim() === '') {
+        throw new Error('VITE_API_URL no está configurada. Por favor, configura la variable de entorno VITE_API_URL en el servidor.')
+      }
+      endpoint = `${apiUrl}/api/v1/constancias/solicitar`
+    }
+    
+    // Validar que el endpoint sea válido
+    if (!endpoint || endpoint.trim() === '') {
+      throw new Error('No se pudo determinar la URL del endpoint del backend. Verifica la configuración de VITE_API_URL.')
+    }
     
     console.log('📤 [Nueva Solicitud] Enviando solicitud al backend...')
     console.log('   Tipo de constancia:', solicitudBody.nombreTipoConstancia)
@@ -509,7 +543,21 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
 
   } catch (error) {
     console.error('❌ [Nueva Solicitud] Error al hacer la petición:', error)
-    alert(`Error al crear la solicitud:\n\n${error instanceof Error ? error.message : 'Error desconocido'}`)
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+        ? error 
+        : 'Error desconocido'
+    
+    // Si el error menciona apiUrl, dar un mensaje más claro
+    if (errorMessage.includes('apiUrl') || errorMessage.includes('is not defined')) {
+      console.error('   🔴 Error de configuración: VITE_API_URL no está definida o es inválida')
+      console.error('   Verifica que la variable de entorno VITE_API_URL esté configurada correctamente')
+      console.error('   Valor actual de VITE_API_URL:', import.meta.env.VITE_API_URL || '(no definida)')
+      alert(`Error de configuración:\n\nLa URL del backend no está configurada correctamente.\n\nVerifica que la variable VITE_API_URL esté definida en el archivo .env o en las variables de entorno del servidor.\n\nValor actual: ${import.meta.env.VITE_API_URL || '(no definida)'}`)
+    } else {
+      alert(`Error al crear la solicitud:\n\n${errorMessage}`)
+    }
   }
 }
 
@@ -643,7 +691,7 @@ const handleTestEndpoint = async () => {
     console.log('   Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   URL relativa:', endpoint)
     if (isDevelopment) {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+      // apiUrl ya está declarado arriba en el try
       console.log('   URL completa (proxy redirige a):', apiUrl + endpoint)
     } else {
       console.log('   URL completa:', endpoint)
@@ -700,7 +748,7 @@ const handleTestEndpoint = async () => {
     })
     console.log('   Comparación con Postman:')
     console.log('     - URL:', isDevelopment ? '✅ Relativa (proxy redirige)' : '✅ Completa')
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // apiUrl ya está declarado arriba en el try
     console.log('     - URL destino:', isDevelopment ? apiUrl + endpoint : endpoint)
     console.log('     - Method: ✅ POST')
     console.log('     - Body: ✅ Correcto')

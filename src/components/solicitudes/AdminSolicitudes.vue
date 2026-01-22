@@ -265,10 +265,19 @@ const fetchRequests = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
     
+    // 📋 Logs de configuración del backend API
+    console.log('🔌 [Admin Solicitudes] Configuración del Backend API:')
+    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
+    
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? '/api/v1/constancias/todas/estado'
       : `${apiUrl}/api/v1/constancias/todas/estado`
+    
+    console.log('   - Endpoint relativo:', '/api/v1/constancias/todas/estado')
+    console.log('   - Endpoint completo:', endpoint)
+    console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
     
     console.log('📥 [Admin Solicitudes] Obteniendo todas las solicitudes del backend...')
     console.log('   Endpoint:', endpoint)

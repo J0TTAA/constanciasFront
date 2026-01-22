@@ -202,10 +202,20 @@ const handleViewDocument = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
     
+    // 📋 Logs de configuración del backend API
+    console.log('🔌 [Ver Documento] Configuración del Backend API:')
+    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
+    console.log('   - ID Solicitud:', props.request.id)
+    
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/previsualizar`
       : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/previsualizar`
+    
+    console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/previsualizar`)
+    console.log('   - Endpoint completo:', endpoint)
+    console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
     
     console.log('📄 [Documento] Obteniendo previsualización PDF del backend...')
     console.log('   Endpoint:', endpoint)
@@ -552,14 +562,21 @@ const handleDownloadOriginal = async () => {
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
     const isDevelopment = import.meta.env.DEV
     
+    // 📋 Logs de configuración del backend API
+    console.log('🔌 [Descargar Documento] Configuración del Backend API:')
+    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
+    console.log('   - ID Solicitud:', props.request.id)
+    
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/descargar`
       : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/descargar`
     
     console.log('📥 [Descarga] Descargando documento original (DOCX)...')
-    console.log('   Endpoint:', endpoint)
-    console.log('   ID Solicitud:', props.request.id)
+    console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/descargar`)
+    console.log('   - Endpoint completo:', endpoint)
+    console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
 
     // Limpiar el token de espacios
     const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
