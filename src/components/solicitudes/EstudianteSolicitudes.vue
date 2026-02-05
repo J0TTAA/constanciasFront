@@ -2,14 +2,14 @@
   <div class="solicitudes-wrapper">
     <template v-if="!selectedRequest">
       <div class="d-flex align-center gap-2 mb-5">
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-plus"
-          size="large"
-          @click="showModal = true"
-        >
-          Nueva Solicitud
-        </v-btn>
+      <v-btn
+        color="primary"
+        prepend-icon="mdi-plus"
+        size="large"
+        @click="showModal = true"
+      >
+        Nueva Solicitud
+      </v-btn>
         
         <!-- Botón para recargar solicitudes -->
         <v-btn
@@ -512,31 +512,31 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     // Crear la solicitud local para mostrar en la tabla
     const newId = responseData.id || `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
 
-    const newRequest: Request = {
-      id: newId,
+  const newRequest: Request = {
+    id: newId,
       type: solicitudBody.nombreTipoConstancia,
-      studentName: currentUser.value.name,
+    studentName: currentUser.value.name,
       studentId: auth.user?.email || 'N/A',
-      requestDate: new Date().toISOString(),
-      lastUpdateDate: new Date().toISOString(),
-      status: RequestStatus.REQUESTED,
+    requestDate: new Date().toISOString(),
+    lastUpdateDate: new Date().toISOString(),
+    status: RequestStatus.REQUESTED,
       observations: solicitudBody.observacionAlumno || '',
-      history: [
-        {
-          id: `${newId}-1`,
-          date: new Date().toISOString(),
-          user: currentUser.value.name,
-          status: RequestStatus.REQUESTED,
+    history: [
+      {
+        id: `${newId}-1`,
+        date: new Date().toISOString(),
+        user: currentUser.value.name,
+        status: RequestStatus.REQUESTED,
           observation: solicitudBody.observacionAlumno || 'Solicitud creada.',
-        },
-      ],
-    }
+      },
+    ],
+  }
 
     // Recargar las solicitudes desde el backend para obtener la versión actualizada
     await fetchRequests()
     
     // Cerrar el modal después de éxito
-    showModal.value = false
+  showModal.value = false
 
     // Mostrar mensaje de éxito (opcional, puedes usar un snackbar en lugar de alert)
     console.log('✅ Solicitud creada exitosamente')

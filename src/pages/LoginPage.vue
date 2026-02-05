@@ -99,18 +99,18 @@
                 >
                   ¿Olvidaste tu contraseña?
                 </a>
-              </div>
+            </div>
 
               <!-- Mensaje de error -->
-              <v-alert
-                v-if="error"
-                type="error"
-                variant="tonal"
+            <v-alert
+              v-if="error"
+              type="error"
+              variant="tonal"
                 class="mt-2 text-caption"
-                density="compact"
-              >
-                {{ error }}
-              </v-alert>
+              density="compact"
+            >
+              {{ error }}
+            </v-alert>
             </v-form>
 
             <p

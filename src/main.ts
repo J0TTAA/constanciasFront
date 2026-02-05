@@ -35,17 +35,17 @@ async function initApp() {
     if (!import.meta.env.VITE_API_URL) {
       console.warn('⚠️ [Configuración] VITE_API_URL no está definida - se usará http://localhost:3020 por defecto')
     }
-    
-    const auth = useAuthStore()
-    
-    // 🔵 Cargar datos del usuario ANTES de iniciar el router
-    await auth.loadFromStorage()
+
+const auth = useAuthStore()
+
+// 🔵 Cargar datos del usuario ANTES de iniciar el router
+await auth.loadFromStorage()
     console.log('✅ [main.ts] Store de autenticación cargado')
-    
-    app.use(router)
-    app.use(vuetify)
-    
-    app.mount("#app")
+
+app.use(router)
+app.use(vuetify)
+
+app.mount("#app")
     console.log('✅ [main.ts] Aplicación montada correctamente')
   } catch (error) {
     console.error('❌ [main.ts] Error al inicializar la aplicación:', error)
