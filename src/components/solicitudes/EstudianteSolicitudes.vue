@@ -206,9 +206,10 @@ const fetchRequests = async () => {
     console.log('   - URL base del backend:', apiUrl)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/mis/estado'
-      : `${apiUrl}/api/v1/constancias/mis/estado`
+      : `${apiUrl}/constancias/mis/estado`
     
     console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
     console.log('   - Endpoint relativo:', '/api/v1/constancias/mis/estado')
@@ -439,6 +440,7 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     const isDevelopment = import.meta.env.DEV || false
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     // Asegurar que el endpoint siempre tenga un valor válido
     let endpoint: string
     if (isDevelopment) {
@@ -448,7 +450,7 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
       if (!apiUrl || apiUrl.trim() === '') {
         throw new Error('VITE_API_URL no está configurada. Por favor, configura la variable de entorno VITE_API_URL en el servidor.')
       }
-      endpoint = `${apiUrl}/api/v1/constancias/solicitar`
+      endpoint = `${apiUrl}/constancias/solicitar`
     }
     
     // Validar que el endpoint sea válido
@@ -605,9 +607,10 @@ const handleTestEndpoint = async () => {
     const isDevelopment = import.meta.env.DEV
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
-      : `${apiUrl}/api/v1/constancias/solicitar` // URL completa en producción
+      : `${apiUrl}/constancias/solicitar` // URL completa en producción (sin /api/v1 porque Nginx lo maneja)
     
     // Body completo para "Alumno Regular" según los ejemplos proporcionados
     const body = {

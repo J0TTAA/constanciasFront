@@ -271,9 +271,10 @@ const fetchRequests = async () => {
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/todas/estado'
-      : `${apiUrl}/api/v1/constancias/todas/estado`
+      : `${apiUrl}/constancias/todas/estado`
     
     console.log('   - Endpoint relativo:', '/api/v1/constancias/todas/estado')
     console.log('   - Endpoint completo:', endpoint)

@@ -209,9 +209,10 @@ const handleViewDocument = async () => {
     console.log('   - ID Solicitud:', props.request.id)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/previsualizar`
-      : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/previsualizar`
+      : `${apiUrl}/constancias/documento/${props.request.id}/previsualizar`
     
     console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/previsualizar`)
     console.log('   - Endpoint completo:', endpoint)
@@ -569,9 +570,10 @@ const handleDownloadOriginal = async () => {
     console.log('   - ID Solicitud:', props.request.id)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
+    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? `/api/v1/constancias/documento/${props.request.id}/descargar`
-      : `${apiUrl}/api/v1/constancias/documento/${props.request.id}/descargar`
+      : `${apiUrl}/constancias/documento/${props.request.id}/descargar`
     
     console.log('📥 [Descarga] Descargando documento original (DOCX)...')
     console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/descargar`)
