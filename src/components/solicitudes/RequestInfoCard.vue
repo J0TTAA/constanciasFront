@@ -167,6 +167,7 @@ const canViewDocument = computed(() => {
   const userRole = auth.user?.role
   return userRole === UserRole.SECRETARY || userRole === UserRole.DIRECTOR || userRole === UserRole.ADMIN
 })
+const documentIdToUse = computed(() => props.request.documentId || props.request.id)
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-CL')
@@ -207,20 +208,25 @@ const handleViewDocument = async () => {
     console.log('   - VITE_API_URL:', apiUrl)
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   - ID Solicitud:', props.request.id)
+    console.log('   - ID Documento:', documentIdToUse.value)
+    console.log('   - ID Documento:', documentIdToUse.value)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
-      ? `/api/v1/constancias/documento/${props.request.id}/previsualizar`
-      : `${apiUrl}/constancias/documento/${props.request.id}/previsualizar`
+      ? `/api/v1/constancias/documento/${documentIdToUse.value}/previsualizar`
+      : `${apiUrl}/api/v1/constancias/documento/${documentIdToUse.value}/previsualizar`
     
-    console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/previsualizar`)
+    console.log(
+      '   - Endpoint relativo:',
+      `/api/v1/constancias/documento/${documentIdToUse.value}/previsualizar`,
+    )
     console.log('   - Endpoint completo:', endpoint)
     console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
     
     console.log('📄 [Documento] Obteniendo previsualización PDF del backend...')
     console.log('   Endpoint:', endpoint)
     console.log('   ID Solicitud:', props.request.id)
+    console.log('   ID Documento:', documentIdToUse.value)
 
     // Limpiar el token de espacios
     const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
@@ -570,13 +576,15 @@ const handleDownloadOriginal = async () => {
     console.log('   - ID Solicitud:', props.request.id)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
-      ? `/api/v1/constancias/documento/${props.request.id}/descargar`
-      : `${apiUrl}/constancias/documento/${props.request.id}/descargar`
+      ? `/api/v1/constancias/documento/${documentIdToUse.value}/descargar`
+      : `${apiUrl}/api/v1/constancias/documento/${documentIdToUse.value}/descargar`
     
     console.log('📥 [Descarga] Descargando documento original (DOCX)...')
-    console.log('   - Endpoint relativo:', `/api/v1/constancias/documento/${props.request.id}/descargar`)
+    console.log(
+      '   - Endpoint relativo:',
+      `/api/v1/constancias/documento/${documentIdToUse.value}/descargar`,
+    )
     console.log('   - Endpoint completo:', endpoint)
     console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
 

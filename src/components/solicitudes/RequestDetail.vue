@@ -26,7 +26,7 @@
         <ActionPanelSecretary
           v-if="
             user.role === UserRole.SECRETARY &&
-            [RequestStatus.REQUESTED, RequestStatus.IN_REVIEW].includes(request.status)
+            [RequestStatus.REQUESTED, RequestStatus.IN_REVIEW, RequestStatus.AWAITING_SIGNATURE].includes(request.status)
           "
           :request="request"
           @update="handleUpdate"

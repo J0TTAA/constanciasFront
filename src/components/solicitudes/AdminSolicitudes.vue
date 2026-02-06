@@ -271,10 +271,9 @@ const fetchRequests = async () => {
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/todas/estado'
-      : `${apiUrl}/constancias/todas/estado`
+      : `${apiUrl}/api/v1/constancias/todas/estado`
     
     console.log('   - Endpoint relativo:', '/api/v1/constancias/todas/estado')
     console.log('   - Endpoint completo:', endpoint)
@@ -361,6 +360,14 @@ const fetchRequests = async () => {
       // Mapear los campos del backend al formato Request
       // El backend ahora incluye nombreUsuario (nombre formateado del usuario) y rutAlumno
       const nombreUsuario = item.nombreUsuario || item.nombreEstudiante || item.estudiante || item.nombre || null
+      const documentIdCandidate =
+        item.codigoDocumento ??
+        item.idDocumento ??
+        item.id_documento ??
+        item.idConstancia ??
+        item.documentoId ??
+        item.documentId ??
+        null
       
       console.log(`   Solicitud ${index + 1}:`)
       console.log(`     - idSolicitud: ${item.idSolicitud}`)
@@ -372,6 +379,7 @@ const fetchRequests = async () => {
       
       const request: Request = {
         id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
+        documentId: documentIdCandidate ? documentIdCandidate.toString() : undefined,
         type: item.tipoConstancia || 'N/A',
         studentName: nombreUsuario || 'Estudiante',
         studentId: item.rutAlumno || item.rut || 'N/A',

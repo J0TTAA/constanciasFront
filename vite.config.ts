@@ -29,6 +29,13 @@ export default defineConfig({
         // Reescribir la URL para mantener el path completo
         rewrite: (path) => path,
       },
+      // Proxy para el backend de usuarios (creación de usuarios por admin)
+      '/api/v1/usuarios': {
+        target: 'http://localhost:3020',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path,
+      },
     },
   },
 })

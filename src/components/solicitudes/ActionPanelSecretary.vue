@@ -27,6 +27,22 @@
       />
     </div>
 
+    <v-alert v-if="signError" type="error" variant="tonal" density="comfortable">
+      {{ signError }}
+    </v-alert>
+
+    <v-btn
+      v-if="canSign"
+      class="panel-action"
+      color="success"
+      :loading="isSigning"
+      :disabled="isSigning"
+      @click="handleSignDocument"
+      prepend-icon="mdi-draw-pen"
+    >
+      Firmar documento
+    </v-btn>
+
     <v-btn
       class="panel-action"
       color="primary"
@@ -40,7 +56,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { RequestStatus } from '@/types/requestTypes'
 import type { Request } from '@/types/requestTypes'
 
@@ -56,6 +73,17 @@ const emit = defineEmits<{
 // El estado local se maneja con ref() en Vue
 const observation = ref('')
 const newStatus = ref<RequestStatus>(props.request.status)
+const isSigning = ref(false)
+const signError = ref<string | null>(null)
+
+const auth = useAuthStore()
+
+const canSign = computed(() =>
+  [RequestStatus.REQUESTED, RequestStatus.IN_REVIEW, RequestStatus.AWAITING_SIGNATURE].includes(
+    props.request.status,
+  ),
+)
+const documentIdToUse = computed(() => props.request.documentId || props.request.id)
 
 const statusOptions = [
   { label: 'En Revisión', value: RequestStatus.IN_REVIEW },
@@ -68,6 +96,89 @@ const handleUpdate = () => {
   if (newStatus.value !== props.request.status) {
     emit('update', props.request.id, newStatus.value, observation.value || 'Sin observaciones.')
     observation.value = '' // Resetea el estado local
+  }
+}
+
+const handleSignDocument = async () => {
+  signError.value = null
+
+  if (!auth.initialized) {
+    await auth.loadFromStorage()
+  }
+
+  const tokenFromStore = auth.token
+  if (!tokenFromStore) {
+    signError.value = 'No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.'
+    return
+  }
+
+  isSigning.value = true
+
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    const isDevelopment = import.meta.env.DEV
+
+    const hasDocumentId = !!props.request.documentId
+    const endpoint = isDevelopment
+      ? hasDocumentId
+        ? `/api/v1/constancias/documento/${documentIdToUse.value}/firmar`
+        : `/api/v1/constancias/solicitud/${props.request.id}/firmar`
+      : hasDocumentId
+        ? `${apiUrl}/api/v1/constancias/documento/${documentIdToUse.value}/firmar`
+        : `${apiUrl}/api/v1/constancias/solicitud/${props.request.id}/firmar`
+
+    const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
+    const parsedId = Number(documentIdToUse.value)
+
+    const payload = {
+      success: true,
+      message: 'Documento firmado correctamente',
+      idDocumento: Number.isNaN(parsedId) ? documentIdToUse.value : parsedId,
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${cleanToken}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      let errorText = ''
+      let errorData: any = null
+
+      try {
+        errorText = await response.text()
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
+      } catch {
+        errorData = { message: 'No se pudo leer el cuerpo de la respuesta' }
+      }
+
+      const errorMessage =
+        errorData?.message || errorData?.msg || `Error ${response.status}: ${response.statusText}`
+      signError.value = `Error al firmar el documento: ${errorMessage}`
+      return
+    }
+
+    let responseData: any = null
+    try {
+      responseData = await response.json()
+    } catch {
+      responseData = null
+    }
+
+    const finalMessage = responseData?.message || payload.message
+    emit('update', props.request.id, RequestStatus.SIGNED, finalMessage)
+  } catch (error) {
+    signError.value = `Error al firmar el documento: ${error instanceof Error ? error.message : 'Error desconocido'}`
+  } finally {
+    isSigning.value = false
   }
 }
 </script>

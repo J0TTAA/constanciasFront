@@ -33,6 +33,7 @@ export interface RequestHistory {
 
 export interface Request {
   id: string
+  documentId?: string
   type: string
   studentName: string
   studentId: string

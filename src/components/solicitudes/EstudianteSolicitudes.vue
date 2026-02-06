@@ -206,10 +206,9 @@ const fetchRequests = async () => {
     console.log('   - URL base del backend:', apiUrl)
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/mis/estado'
-      : `${apiUrl}/constancias/mis/estado`
+      : `${apiUrl}/api/v1/constancias/mis/estado`
     
     console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
     console.log('   - Endpoint relativo:', '/api/v1/constancias/mis/estado')
@@ -270,8 +269,18 @@ const fetchRequests = async () => {
     const mappedRequests: Request[] = backendRequests.map((item: any, index: number) => {
       // Mapear los campos del backend al formato Request según la estructura real:
       // { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual }
+      const documentIdCandidate =
+        item.codigoDocumento ??
+        item.idDocumento ??
+        item.id_documento ??
+        item.idConstancia ??
+        item.documentoId ??
+        item.documentId ??
+        null
+
       const request: Request = {
         id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
+        documentId: documentIdCandidate ? documentIdCandidate.toString() : undefined,
         type: item.tipoConstancia || 'N/A',
         studentName: auth.user?.name || 'Estudiante',
         studentId: auth.user?.email || 'N/A',
@@ -440,7 +449,6 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     const isDevelopment = import.meta.env.DEV || false
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     // Asegurar que el endpoint siempre tenga un valor válido
     let endpoint: string
     if (isDevelopment) {
@@ -450,7 +458,7 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
       if (!apiUrl || apiUrl.trim() === '') {
         throw new Error('VITE_API_URL no está configurada. Por favor, configura la variable de entorno VITE_API_URL en el servidor.')
       }
-      endpoint = `${apiUrl}/constancias/solicitar`
+      endpoint = `${apiUrl}/api/v1/constancias/solicitar`
     }
     
     // Validar que el endpoint sea válido
@@ -512,27 +520,38 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     console.log('   Respuesta:', JSON.stringify(responseData, null, 2))
 
     // Crear la solicitud local para mostrar en la tabla
-    const newId = responseData.id || `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
+    const newId =
+      responseData.idSolicitud ||
+      responseData.id ||
+      `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
+    const newDocumentId =
+      responseData.codigoDocumento ||
+      responseData.idDocumento ||
+      responseData.id_documento ||
+      responseData.documentoId ||
+      responseData.documentId ||
+      undefined
 
-  const newRequest: Request = {
-    id: newId,
+    const newRequest: Request = {
+      id: newId.toString(),
+      documentId: newDocumentId ? newDocumentId.toString() : undefined,
       type: solicitudBody.nombreTipoConstancia,
-    studentName: currentUser.value.name,
+      studentName: currentUser.value.name,
       studentId: auth.user?.email || 'N/A',
-    requestDate: new Date().toISOString(),
-    lastUpdateDate: new Date().toISOString(),
-    status: RequestStatus.REQUESTED,
+      requestDate: new Date().toISOString(),
+      lastUpdateDate: new Date().toISOString(),
+      status: RequestStatus.REQUESTED,
       observations: solicitudBody.observacionAlumno || '',
-    history: [
-      {
-        id: `${newId}-1`,
-        date: new Date().toISOString(),
-        user: currentUser.value.name,
-        status: RequestStatus.REQUESTED,
+      history: [
+        {
+          id: `${newId}-1`,
+          date: new Date().toISOString(),
+          user: currentUser.value.name,
+          status: RequestStatus.REQUESTED,
           observation: solicitudBody.observacionAlumno || 'Solicitud creada.',
-      },
-    ],
-  }
+        },
+      ],
+    }
 
     // Recargar las solicitudes desde el backend para obtener la versión actualizada
     await fetchRequests()
@@ -607,10 +626,9 @@ const handleTestEndpoint = async () => {
     const isDevelopment = import.meta.env.DEV
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
-    // Nginx ya maneja /api/v1, así que solo usamos /constancias/...
     const endpoint = isDevelopment
       ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
-      : `${apiUrl}/constancias/solicitar` // URL completa en producción (sin /api/v1 porque Nginx lo maneja)
+      : `${apiUrl}/api/v1/constancias/solicitar` // URL completa en producción
     
     // Body completo para "Alumno Regular" según los ejemplos proporcionados
     const body = {
