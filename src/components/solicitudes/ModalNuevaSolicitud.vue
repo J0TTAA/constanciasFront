@@ -32,11 +32,43 @@
           <!--
             v-textarea para las Observaciones
           -->
-          <v-label class="font-weight-medium mb-1 mt-3">Género</v-label>
-          <v-radio-group v-model="genero" inline :rules="[rules.required]" class="mb-4">
-            <v-radio label="Masculino" value="masculino"></v-radio>
-            <v-radio label="Femenino" value="femenino"></v-radio>
-          </v-radio-group>
+          <template v-if="tipoConstancia">
+            <v-label class="font-weight-medium mb-1 mt-3">Tratamiento</v-label>
+            <v-select
+              v-model="tratamiento"
+              :items="tratamientosDisponibles"
+              item-title="label"
+              item-value="value"
+              variant="outlined"
+              placeholder="Seleccione una opción"
+              :rules="[rules.required]"
+              class="mb-3"
+            ></v-select>
+
+            <v-label class="font-weight-medium mb-1">Calidad</v-label>
+            <v-select
+              v-model="calidadAlumno"
+              :items="calidadesDisponibles"
+              item-title="label"
+              item-value="value"
+              variant="outlined"
+              placeholder="Seleccione una opción"
+              :rules="[rules.required]"
+              class="mb-3"
+            ></v-select>
+
+            <v-label class="font-weight-medium mb-1">Cierre</v-label>
+            <v-select
+              v-model="cierreSolicitud"
+              :items="cierresDisponibles"
+              item-title="label"
+              item-value="value"
+              variant="outlined"
+              placeholder="Seleccione una opción"
+              :rules="[rules.required]"
+              class="mb-4"
+            ></v-select>
+          </template>
 
           <!-- Campos específicos para "Inscripción Asignaturas" -->
           <template v-if="tipoConstancia === 'Inscripción Asignaturas'">
@@ -94,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 // --- Props y Emits para el v-model ---
@@ -107,7 +139,9 @@ const auth = useAuthStore()
 // --- Estado Interno del Formulario ---
 const form = ref<any>(null) // Referencia al v-form
 const tipoConstancia = ref<string | null>(null)
-const genero = ref<"masculino" | "femenino" | null>(null)
+const tratamiento = ref<string | null>(null)
+const calidadAlumno = ref<string | null>(null)
+const cierreSolicitud = ref<string | null>(null)
 const observaciones = ref('')
 const semestre = ref('')
 const proposito = ref('')
@@ -125,16 +159,6 @@ const constanciaBodies = {
   'Alumno Regular': {
     base: {
       nombreTipoConstancia: 'Alumno Regular',
-    },
-    masculino: {
-      titulo1: 'El',
-      titulo3: 'alumno',
-      semestre: 'Primer Semestre 2026',
-      proposito: 'trámites universitarios',
-    },
-    femenino: {
-      titulo1: 'La',
-      titulo3: 'alumna',
       semestre: 'Primer Semestre 2026',
       proposito: 'trámites universitarios',
     },
@@ -142,17 +166,6 @@ const constanciaBodies = {
   'Examen': {
     base: {
       nombreTipoConstancia: 'Examen',
-    },
-    masculino: {
-      titulo1: 'El',
-      titulo3: 'alumno',
-      titulo4: 'del',
-      proposito: 'postular a la Beca Doctorado Nacional ANID',
-    },
-    femenino: {
-      titulo1: 'la Srta.',
-      titulo3: 'alumna',
-      titulo4: 'de la',
       proposito: 'postular a la Beca Doctorado Nacional ANID',
     },
   },
@@ -162,34 +175,89 @@ const constanciaBodies = {
       semestre: 'Primer Semestre de 2025',
       proposito: 'gestionar la renovación de su Beca Doctorado Nacional de ANID',
     },
-    masculino: {
-      titulo1: 'El',
-      titulo2: 'Sr.',
-      titulo3: 'alumno',
-      titulo4: 'del',
-      titulo5: 'interesado',
-    },
-    femenino: {
-      titulo1: 'La',
-      titulo2: 'Srta.',
-      titulo3: 'alumna',
-      titulo4: 'de la',
-      titulo5: 'interesada',
-    },
   },
 }
 
+const opcionesPorConstancia = {
+  'Alumno Regular': {
+    tratamientos: [
+      { label: 'la Srta.', value: { titulo1: 'la Srta.', titulo2: '' } },
+      { label: 'el Sr.', value: { titulo1: 'el Sr.', titulo2: '' } },
+      { label: 'la alumna', value: { titulo1: 'la alumna', titulo2: '' } },
+      { label: 'el alumno', value: { titulo1: 'el alumno', titulo2: '' } },
+    ],
+    calidades: [
+      { label: 'alumna', value: { titulo3: 'alumna' } },
+      { label: 'alumno', value: { titulo3: 'alumno' } },
+    ],
+    cierres: [
+      { label: 'de la interesada', value: { titulo4: 'de la', titulo5: 'interesada' } },
+      { label: 'del interesado', value: { titulo4: 'del', titulo5: 'interesado' } },
+      { label: 'de la estudiante', value: { titulo4: 'de la', titulo5: 'estudiante' } },
+    ],
+  },
+  'Examen': {
+    tratamientos: [
+      { label: 'la Srta.', value: { titulo1: 'la Srta.', titulo2: '' } },
+      { label: 'el Sr.', value: { titulo1: 'el Sr.', titulo2: '' } },
+    ],
+    calidades: [
+      { label: 'alumna', value: { titulo3: 'alumna' } },
+      { label: 'alumno', value: { titulo3: 'alumno' } },
+    ],
+    cierres: [
+      { label: 'de la estudiante', value: { titulo4: 'de la', titulo5: 'estudiante' } },
+      { label: 'del estudiante', value: { titulo4: 'del', titulo5: 'estudiante' } },
+    ],
+  },
+  'Inscripción Asignaturas': {
+    tratamientos: [
+      { label: 'la alumna', value: { titulo1: 'la alumna', titulo2: '' } },
+      { label: 'el alumno', value: { titulo1: 'el alumno', titulo2: '' } },
+      { label: 'La', value: { titulo1: 'La', titulo2: '' } },
+      { label: 'El', value: { titulo1: 'El', titulo2: '' } },
+    ],
+    calidades: [
+      { label: 'alumna', value: { titulo3: 'alumna' } },
+      { label: 'alumno', value: { titulo3: 'alumno' } },
+    ],
+    cierres: [
+      { label: 'de la interesada', value: { titulo4: 'de la', titulo5: 'interesada' } },
+      { label: 'del interesado', value: { titulo4: 'del', titulo5: 'interesado' } },
+    ],
+  },
+}
+
+const tratamientosDisponibles = computed(() => {
+  if (!tipoConstancia.value) return []
+  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].tratamientos
+})
+
+const calidadesDisponibles = computed(() => {
+  if (!tipoConstancia.value) return []
+  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].calidades
+})
+
+const cierresDisponibles = computed(() => {
+  if (!tipoConstancia.value) return []
+  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].cierres
+})
+
 const solicitudBody = computed(() => {
-  if (!tipoConstancia.value || !genero.value) return null
+  if (!tipoConstancia.value || !tratamiento.value || !calidadAlumno.value || !cierreSolicitud.value) return null
 
   const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
-  const generoSpecificBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies][genero.value]
+  const tratamientoBody = tratamiento.value as { titulo1: string; titulo2: string }
+  const calidadBody = calidadAlumno.value as { titulo3: string }
+  const cierreBody = cierreSolicitud.value as { titulo4: string; titulo5: string }
 
   // Construir el body según las especificaciones del backend
   // Nota: El backend puede obtener rutAlumno del token JWT, pero lo incluimos por si acaso
   const finalBody: Record<string, any> = {
     nombreTipoConstancia: baseBody.nombreTipoConstancia,
-    ...generoSpecificBody,
+    ...tratamientoBody,
+    ...calidadBody,
+    ...cierreBody,
   }
 
   // Agregar observacionAlumno si el usuario la proporcionó
@@ -203,14 +271,6 @@ const solicitudBody = computed(() => {
   }
   if (baseBody.proposito) {
     finalBody.proposito = baseBody.proposito
-  }
-
-  // Si el género ya tiene semestre o proposito, usar esos (sobrescribir)
-  if (generoSpecificBody.semestre) {
-    finalBody.semestre = generoSpecificBody.semestre
-  }
-  if (generoSpecificBody.proposito) {
-    finalBody.proposito = generoSpecificBody.proposito
   }
 
   // Si el usuario ingresó valores personalizados para "Inscripción Asignaturas", usar esos
@@ -252,9 +312,17 @@ const submitForm = async () => {
 
   // 3. Limpiar campos (el modal se cerrará desde el componente padre después de la respuesta)
   tipoConstancia.value = null
-  genero.value = null
+  tratamiento.value = null
+  calidadAlumno.value = null
+  cierreSolicitud.value = null
   observaciones.value = ''
   semestre.value = ''
   proposito.value = ''
 }
+
+watch(tipoConstancia, () => {
+  tratamiento.value = null
+  calidadAlumno.value = null
+  cierreSolicitud.value = null
+})
 </script>

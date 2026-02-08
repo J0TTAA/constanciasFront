@@ -377,10 +377,15 @@ const fetchRequests = async () => {
       console.log(`     - nombre (raw): ${item.nombre}`)
       console.log(`     - nombreUsuario final: ${nombreUsuario}`)
       
+      // Extraer el nombre del tipo de constancia (puede venir como objeto o string)
+      const tipoConstanciaNombre = typeof item.tipoConstancia === 'object' && item.tipoConstancia !== null
+        ? item.tipoConstancia.nombre
+        : item.tipoConstancia
+      
       const request: Request = {
         id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
         documentId: documentIdCandidate ? documentIdCandidate.toString() : undefined,
-        type: item.tipoConstancia || 'N/A',
+        type: tipoConstanciaNombre || 'N/A',
         studentName: nombreUsuario || 'Estudiante',
         studentId: item.rutAlumno || item.rut || 'N/A',
         requestDate: item.fechaSolicitud || new Date().toISOString(),

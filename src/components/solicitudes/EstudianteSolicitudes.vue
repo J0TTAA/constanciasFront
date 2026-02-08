@@ -155,6 +155,7 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
     'PARA FIRMA': RequestStatus.AWAITING_SIGNATURE,
     'FIRMADO Y DISPONIBLE': RequestStatus.SIGNED,
     'FIRMADO': RequestStatus.SIGNED,
+    'FIRMADA': RequestStatus.SIGNED,
     'RECHAZADO': RequestStatus.REJECTED,
     // Estados en formato normal (por si acaso)
     'Solicitado': RequestStatus.REQUESTED,
@@ -207,11 +208,11 @@ const fetchRequests = async () => {
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
     const endpoint = isDevelopment
-      ? '/api/v1/constancias/mis/estado'
-      : `${apiUrl}/api/v1/constancias/mis/estado`
+      ? '/api/v1/constancias/mis'
+      : `${apiUrl}/api/v1/constancias/mis`
     
     console.log('📥 [Solicitudes] Obteniendo solicitudes del backend...')
-    console.log('   - Endpoint relativo:', '/api/v1/constancias/mis/estado')
+    console.log('   - Endpoint relativo:', '/api/v1/constancias/mis')
     console.log('   - Endpoint completo:', endpoint)
     console.log('   - URL final que se usará:', isDevelopment ? `http://localhost:3000${endpoint} (proxy → ${apiUrl}${endpoint})` : endpoint)
 
@@ -268,7 +269,7 @@ const fetchRequests = async () => {
 
     const mappedRequests: Request[] = backendRequests.map((item: any, index: number) => {
       // Mapear los campos del backend al formato Request según la estructura real:
-      // { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual }
+      // { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual, historiales }
       const documentIdCandidate =
         item.codigoDocumento ??
         item.idDocumento ??
@@ -278,22 +279,33 @@ const fetchRequests = async () => {
         item.documentId ??
         null
 
+      // Opción 1 (recomendada): usar estadoActual
+      // Opción 2: si estadoActual no está, usar el primer historial
+      const estadoBackend = item.estadoActual || 
+        item.historiales?.[0]?.estado?.nombreEstado || 
+        'SOLICITADA'
+
+      // Extraer el nombre del tipo de constancia (puede venir como objeto o string)
+      const tipoConstanciaNombre = typeof item.tipoConstancia === 'object' && item.tipoConstancia !== null
+        ? item.tipoConstancia.nombre
+        : item.tipoConstancia
+
       const request: Request = {
         id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
         documentId: documentIdCandidate ? documentIdCandidate.toString() : undefined,
-        type: item.tipoConstancia || 'N/A',
+        type: tipoConstanciaNombre || 'N/A',
         studentName: auth.user?.name || 'Estudiante',
         studentId: auth.user?.email || 'N/A',
         requestDate: item.fechaSolicitud || new Date().toISOString(),
         lastUpdateDate: item.fechaActualizacion || item.fechaSolicitud || new Date().toISOString(),
-        status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+        status: mapBackendStatusToRequestStatus(estadoBackend),
         observations: item.observacionAlumno || item.observaciones || '',
         history: [
           {
             id: `${item.idSolicitud || index}-1`,
             date: item.fechaSolicitud || new Date().toISOString(),
             user: auth.user?.name || 'Estudiante',
-            status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+            status: mapBackendStatusToRequestStatus(estadoBackend),
             observation: item.observacionAlumno || item.observaciones || 'Solicitud creada.',
           },
         ],

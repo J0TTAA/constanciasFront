@@ -167,6 +167,7 @@ const canViewDocument = computed(() => {
   const userRole = auth.user?.role
   return userRole === UserRole.SECRETARY || userRole === UserRole.DIRECTOR || userRole === UserRole.ADMIN
 })
+
 const documentIdToUse = computed(() => props.request.documentId || props.request.id)
 
 const formatDate = (dateString: string) => {
