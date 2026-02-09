@@ -140,6 +140,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onUnmounted } from 'vue'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import { UserRole } from '@/types/requestTypes'
 import type { Request } from '@/types/requestTypes'
@@ -200,13 +201,13 @@ const handleViewDocument = async () => {
   documentUrl.value = null
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     // 📋 Logs de configuración del backend API
     console.log('🔌 [Ver Documento] Configuración del Backend API:')
-    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Base URL (normalizada):', apiUrl)
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   - ID Solicitud:', props.request.id)
     console.log('   - ID Documento:', documentIdToUse.value)
@@ -566,13 +567,13 @@ const handleDownloadOriginal = async () => {
   isDownloadingDocument.value = true
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     // 📋 Logs de configuración del backend API
     console.log('🔌 [Descargar Documento] Configuración del Backend API:')
-    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Base URL (normalizada):', apiUrl)
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   - ID Solicitud:', props.request.id)
     

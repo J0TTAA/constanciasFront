@@ -55,6 +55,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { RequestStatus, UserRole } from '@/types/requestTypes'
 import type { Request, User, RequestHistory } from '@/types/requestTypes'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 
 // Importa los componentes
@@ -124,7 +125,7 @@ const loadFullHistory = async () => {
   historyError.value = null
 
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     const endpoint = isDevelopment

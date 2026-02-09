@@ -69,6 +69,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from 'vue'
 import type { VDataTable } from 'vuetify/components'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import RequestDetail from './RequestDetail.vue'
 import { RequestStatus, UserRole } from '@/types/requestTypes'
@@ -262,8 +263,8 @@ const fetchRequests = async () => {
   requestsError.value = null
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     // 📋 Logs de configuración del backend API

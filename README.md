@@ -23,6 +23,14 @@ TypeScript cannot handle type information for `.vue` imports by default, so we r
 
 See [Vite Configuration Reference](https://vite.dev/config/).
 
+## Variables de entorno
+
+Copia `.env.example` a `.env` y ajusta los valores. Importante:
+
+- **VITE_API_URL**: URL **base** del backend, **sin** el path `/api/v1`.  
+  Correcto: `http://srv-drrnn.ufro.cl`  
+  Incorrecto: `http://srv-drrnn.ufro.cl/api/v1` (genera rutas con `/api/v1` duplicado).
+
 ## Project Setup
 
 ```sh
