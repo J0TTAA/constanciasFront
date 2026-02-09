@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import { RequestStatus } from '@/types/requestTypes'
 import type { Request } from '@/types/requestTypes'
@@ -115,7 +116,7 @@ const handleSignDocument = async () => {
   isSigning.value = true
 
   try {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
 
     const hasDocumentId = !!props.request.documentId

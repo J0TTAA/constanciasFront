@@ -93,6 +93,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue'
 import type { VDataTable } from 'vuetify/components'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import RequestDetail from './RequestDetail.vue'
 import ModalNuevaSolicitud from './ModalNuevaSolicitud.vue'
@@ -196,13 +197,13 @@ const fetchRequests = async () => {
   requestsError.value = null
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     // 📋 Logs de configuración del backend API
     console.log('🔌 [Solicitudes] Configuración del Backend API:')
-    console.log('   - VITE_API_URL:', apiUrl)
+    console.log('   - Base URL (normalizada):', apiUrl)
     console.log('   - Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
     console.log('   - URL base del backend:', apiUrl)
     
@@ -443,30 +444,15 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
   }
 
   try {
-    // Usar variable de entorno para la URL del backend
-    // Asegurar que siempre haya un valor válido
-    let rawApiUrl: string | undefined
-    try {
-      rawApiUrl = import.meta.env.VITE_API_URL
-    } catch (e) {
-      console.warn('⚠️ No se pudo leer VITE_API_URL:', e)
-      rawApiUrl = undefined
-    }
-    
-    // Validar y limpiar la URL del API
-    const apiUrl: string = (rawApiUrl && typeof rawApiUrl === 'string' && rawApiUrl.trim() !== '') 
-      ? rawApiUrl.trim() 
-      : 'http://localhost:3020'
-    
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV || false
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa
-    // Asegurar que el endpoint siempre tenga un valor válido
     let endpoint: string
     if (isDevelopment) {
       endpoint = '/api/v1/constancias/solicitar'
     } else {
-      // Validar que apiUrl esté definida antes de usarla
       if (!apiUrl || apiUrl.trim() === '') {
         throw new Error('VITE_API_URL no está configurada. Por favor, configura la variable de entorno VITE_API_URL en el servidor.')
       }
@@ -633,11 +619,10 @@ const handleTestEndpoint = async () => {
   isTestingEndpoint.value = true
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
-    // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno
     const endpoint = isDevelopment
       ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
       : `${apiUrl}/api/v1/constancias/solicitar` // URL completa en producción

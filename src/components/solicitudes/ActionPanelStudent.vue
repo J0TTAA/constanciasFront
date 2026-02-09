@@ -40,6 +40,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import { RequestStatus } from '@/types/requestTypes'
 import type { Request } from '@/types/requestTypes'
@@ -67,8 +68,8 @@ const onDownload = async () => {
   isDownloading.value = true
 
   try {
-    // Usar variable de entorno para la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Usar URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV
     
     // En desarrollo, usar proxy de Vite. En producción, usar la URL completa desde variable de entorno

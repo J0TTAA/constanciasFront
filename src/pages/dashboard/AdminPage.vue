@@ -268,6 +268,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -325,8 +326,8 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    // Obtener la URL del backend
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3020'
+    // Obtener la URL base normalizada (sin /api/v1 duplicado)
+    const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV || false
 
     // Construir endpoint completo
