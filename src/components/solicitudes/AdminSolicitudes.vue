@@ -220,6 +220,7 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
     'PARA FIRMA': RequestStatus.AWAITING_SIGNATURE,
     'FIRMADO Y DISPONIBLE': RequestStatus.SIGNED,
     'FIRMADO': RequestStatus.SIGNED,
+    'FIRMADA': RequestStatus.SIGNED,
     'RECHAZADO': RequestStatus.REJECTED,
     'DESCONOCIDO': RequestStatus.REQUESTED, // Manejar estado desconocido como solicitado
     // Estados en formato normal (por si acaso)
@@ -371,6 +372,8 @@ const fetchRequests = async () => {
       
       console.log(`   Solicitud ${index + 1}:`)
       console.log(`     - idSolicitud: ${item.idSolicitud}`)
+      console.log(`     - estadoActual (raw): ${item.estadoActual}`)
+      console.log(`     - historiales:`, item.historiales)
       console.log(`     - nombreUsuario (raw): ${item.nombreUsuario}`)
       console.log(`     - nombreEstudiante (raw): ${item.nombreEstudiante}`)
       console.log(`     - estudiante (raw): ${item.estudiante}`)
@@ -382,6 +385,14 @@ const fetchRequests = async () => {
         ? item.tipoConstancia.nombre
         : item.tipoConstancia
       
+      // Opción 1 (recomendada): usar estadoActual
+      // Opción 2: si estadoActual no está, usar el primer historial
+      const estadoBackend = item.estadoActual || 
+        item.historiales?.[0]?.estado?.nombreEstado || 
+        'SOLICITADA'
+      
+      console.log(`     - estadoBackend final: ${estadoBackend}`)
+      
       const request: Request = {
         id: item.idSolicitud?.toString() || `RRNN-${index + 1}`,
         documentId: documentIdCandidate ? documentIdCandidate.toString() : undefined,
@@ -390,14 +401,14 @@ const fetchRequests = async () => {
         studentId: item.rutAlumno || item.rut || 'N/A',
         requestDate: item.fechaSolicitud || new Date().toISOString(),
         lastUpdateDate: item.fechaActualizacion || item.fechaSolicitud || new Date().toISOString(),
-        status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+        status: mapBackendStatusToRequestStatus(estadoBackend),
         observations: item.observacionAlumno || item.observaciones || '',
         history: [
           {
             id: `${item.idSolicitud || index}-1`,
             date: item.fechaSolicitud || new Date().toISOString(),
             user: nombreUsuario || 'Estudiante',
-            status: mapBackendStatusToRequestStatus(item.estadoActual || 'SOLICITADA'),
+            status: mapBackendStatusToRequestStatus(estadoBackend),
             observation: item.observacionAlumno || item.observaciones || 'Solicitud creada.',
           },
         ],
