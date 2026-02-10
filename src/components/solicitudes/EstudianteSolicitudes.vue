@@ -142,7 +142,6 @@ const snackbarText = ref('')
 const snackbarColor = ref<'success' | 'error' | 'info'>('info')
 
 const headers = ref<VDataTable['$props']['headers']>([
-  { title: 'ID SOLICITUD', key: 'id' },
   { title: 'TIPO CONSTANCIA', key: 'tipo' },
   { title: 'FECHA SOLICITUD', key: 'fecha' },
   { title: 'ESTADO', key: 'estado' },
