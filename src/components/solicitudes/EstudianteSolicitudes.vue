@@ -19,22 +19,9 @@
           prepend-icon="mdi-refresh"
           :loading="isLoadingRequests"
           :disabled="isLoadingRequests || !auth.token"
-          @click="fetchRequests"
+          @click="fetchRequests({ showFeedback: true })"
         >
           Actualizar
-        </v-btn>
-        
-        <!-- Botón de prueba para endpoint -->
-        <v-btn
-          color="secondary"
-          variant="outlined"
-          size="small"
-          prepend-icon="mdi-test-tube"
-          :loading="isTestingEndpoint"
-          :disabled="isTestingEndpoint || !auth.token"
-          @click="handleTestEndpoint"
-        >
-          Prueba API
         </v-btn>
       </div>
 
@@ -87,6 +74,15 @@
       @back="handleBack"
       @update="handleRequestUpdate"
     />
+
+    <v-snackbar
+      v-model="snackbarOpen"
+      :color="snackbarColor"
+      :timeout="2500"
+      location="bottom"
+    >
+      {{ snackbarText }}
+    </v-snackbar>
   </div>
 </template>
 
@@ -100,6 +96,37 @@ import ModalNuevaSolicitud from './ModalNuevaSolicitud.vue'
 import { RequestStatus, UserRole } from '@/types/requestTypes'
 import type { Request, User } from '@/types/requestTypes'
 
+type BackendRequestItem = {
+  idSolicitud?: string | number
+  codigoDocumento?: string | number
+  idDocumento?: string | number
+  id_documento?: string | number
+  idConstancia?: string | number
+  documentoId?: string | number
+  documentId?: string | number
+  tipoConstancia?: { nombre?: string } | string
+  fechaSolicitud?: string
+  fechaActualizacion?: string
+  estadoActual?: string
+  historiales?: Array<{ estado?: { nombreEstado?: string } }>
+  observacionAlumno?: string
+  observaciones?: string
+  urlArchivo?: string
+  fileUrl?: string
+  documentoUrl?: string
+}
+
+type BackendResponseList = BackendRequestItem[] | { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }
+
+type NuevaSolicitudBody = {
+  nombreTipoConstancia: string
+  observacionAlumno?: string
+  [key: string]: unknown
+}
+
+const readErrorField = (obj: Record<string, unknown> | null, key: string): string | undefined =>
+  obj && typeof obj[key] === 'string' ? (obj[key] as string) : undefined
+
 const auth = useAuthStore()
 
 const requests = ref<Request[]>([])
@@ -109,7 +136,10 @@ const requestsError = ref<string | null>(null)
 const selectedRequestId = ref<string | null>(null)
 
 const showModal = ref(false)
-const isTestingEndpoint = ref(false)
+
+const snackbarOpen = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref<'success' | 'error' | 'info'>('info')
 
 const headers = ref<VDataTable['$props']['headers']>([
   { title: 'ID SOLICITUD', key: 'id' },
@@ -179,7 +209,9 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
 }
 
 // Función para obtener las solicitudes del backend
-const fetchRequests = async () => {
+const fetchRequests = async (opts?: { showFeedback?: boolean }) => {
+  const showFeedback = opts?.showFeedback === true
+
   // Verificar que el store esté inicializado
   if (!auth.initialized) {
     await auth.loadFromStorage()
@@ -190,6 +222,11 @@ const fetchRequests = async () => {
   if (!tokenFromStore) {
     console.error('❌ No hay token disponible para obtener las solicitudes')
     requestsError.value = 'No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.'
+    if (showFeedback) {
+      snackbarColor.value = 'error'
+      snackbarText.value = 'No hay sesión activa. Inicia sesión nuevamente.'
+      snackbarOpen.value = true
+    }
     return
   }
 
@@ -234,16 +271,18 @@ const fetchRequests = async () => {
 
     if (!response.ok) {
       let errorText = ''
-      let errorData: any = null
+      let errorData: Record<string, unknown> | null = null
       
       try {
         errorText = await response.text()
         try {
-          errorData = JSON.parse(errorText)
+          const parsed = JSON.parse(errorText) as unknown
+          errorData =
+            typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : { message: String(parsed) }
         } catch {
           errorData = { message: errorText }
         }
-      } catch (e) {
+      } catch {
         errorText = 'No se pudo leer el cuerpo de la respuesta'
         errorData = { message: errorText }
       }
@@ -252,8 +291,16 @@ const fetchRequests = async () => {
       console.error('   Status:', response.status)
       console.error('   Error:', JSON.stringify(errorData, null, 2))
 
-      const errorMessage = errorData.message || errorData.msg || `Error ${response.status}: ${response.statusText}`
+      const errorMessage =
+        readErrorField(errorData, 'message') ||
+        readErrorField(errorData, 'msg') ||
+        `Error ${response.status}: ${response.statusText}`
       requestsError.value = `Error al cargar las solicitudes: ${errorMessage}`
+      if (showFeedback) {
+        snackbarColor.value = 'error'
+        snackbarText.value = 'No se pudieron actualizar los datos.'
+        snackbarOpen.value = true
+      }
       return
     }
 
@@ -264,11 +311,13 @@ const fetchRequests = async () => {
 
     // Mapear la respuesta del backend al formato Request
     // El backend devuelve un array directamente
-    const backendRequests = Array.isArray(responseData) 
-      ? responseData 
-      : (responseData.data || responseData.solicitudes || [])
+    const backendRequests: BackendRequestItem[] = Array.isArray(responseData as BackendResponseList)
+      ? (responseData as BackendRequestItem[])
+      : ((responseData as { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }).data ||
+          (responseData as { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }).solicitudes ||
+          [])
 
-    const mappedRequests: Request[] = backendRequests.map((item: any, index: number) => {
+    const mappedRequests: Request[] = backendRequests.map((item, index: number) => {
       // Mapear los campos del backend al formato Request según la estructura real:
       // { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual, historiales }
       const documentIdCandidate =
@@ -318,10 +367,20 @@ const fetchRequests = async () => {
 
     requests.value = mappedRequests
     console.log(`✅ [Solicitudes] ${mappedRequests.length} solicitudes cargadas`)
+    if (showFeedback) {
+      snackbarColor.value = 'success'
+      snackbarText.value = 'Datos actualizados.'
+      snackbarOpen.value = true
+    }
 
   } catch (error) {
     console.error('❌ [Solicitudes] Error al obtener las solicitudes:', error)
     requestsError.value = `Error al cargar las solicitudes: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    if (showFeedback) {
+      snackbarColor.value = 'error'
+      snackbarText.value = 'Error al actualizar los datos.'
+      snackbarOpen.value = true
+    }
   } finally {
     isLoadingRequests.value = false
   }
@@ -329,7 +388,7 @@ const fetchRequests = async () => {
 
 // Cargar las solicitudes cuando el componente se monte
 onMounted(async () => {
-  await fetchRequests()
+  await fetchRequests({ showFeedback: false })
 })
 
 // Recargar las solicitudes cuando el usuario cambie
@@ -337,7 +396,7 @@ watch(
   () => auth.user?.email,
   async (newEmail) => {
     if (newEmail) {
-      await fetchRequests()
+      await fetchRequests({ showFeedback: false })
     }
   },
   { immediate: false },
@@ -419,7 +478,7 @@ const getStatusIcon = (estado: string) => {
   }
 }
 
-const handleNuevaSolicitud = async (solicitudBody: any) => {
+const handleNuevaSolicitud = async (solicitudBody: NuevaSolicitudBody) => {
   // Verificar que el store esté inicializado
   if (!auth.initialized) {
     await auth.loadFromStorage()
@@ -489,16 +548,18 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     if (!response.ok) {
       // Intentar leer el error
       let errorText = ''
-      let errorData: any = null
+      let errorData: Record<string, unknown> | null = null
       
       try {
         errorText = await response.text()
         try {
-          errorData = JSON.parse(errorText)
+          const parsed = JSON.parse(errorText) as unknown
+          errorData =
+            typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : { message: String(parsed) }
         } catch {
           errorData = { message: errorText }
         }
-      } catch (e) {
+      } catch {
         errorText = 'No se pudo leer el cuerpo de la respuesta'
         errorData = { message: errorText }
       }
@@ -507,7 +568,10 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
       console.error('   Status:', response.status)
       console.error('   Error:', JSON.stringify(errorData, null, 2))
 
-      const errorMessage = errorData.message || errorData.msg || `Error ${response.status}: ${response.statusText}`
+      const errorMessage =
+        readErrorField(errorData, 'message') ||
+        readErrorField(errorData, 'msg') ||
+        `Error ${response.status}: ${response.statusText}`
       alert(`Error al crear la solicitud:\n\n${errorMessage}`)
       return
     }
@@ -517,45 +581,11 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     console.log('✅ [Nueva Solicitud] Solicitud creada exitosamente:')
     console.log('   Respuesta:', JSON.stringify(responseData, null, 2))
 
-    // Crear la solicitud local para mostrar en la tabla
-    const newId =
-      responseData.idSolicitud ||
-      responseData.id ||
-      `RRNN-${Math.floor(Math.random() * 90000 + 10000)}`
-    const newDocumentId =
-      responseData.codigoDocumento ||
-      responseData.idDocumento ||
-      responseData.id_documento ||
-      responseData.documentoId ||
-      responseData.documentId ||
-      undefined
-
-    const newRequest: Request = {
-      id: newId.toString(),
-      documentId: newDocumentId ? newDocumentId.toString() : undefined,
-      type: solicitudBody.nombreTipoConstancia,
-      studentName: currentUser.value.name,
-      studentId: auth.user?.email || 'N/A',
-      requestDate: new Date().toISOString(),
-      lastUpdateDate: new Date().toISOString(),
-      status: RequestStatus.REQUESTED,
-      observations: solicitudBody.observacionAlumno || '',
-      history: [
-        {
-          id: `${newId}-1`,
-          date: new Date().toISOString(),
-          user: currentUser.value.name,
-          status: RequestStatus.REQUESTED,
-          observation: solicitudBody.observacionAlumno || 'Solicitud creada.',
-        },
-      ],
-    }
-
     // Recargar las solicitudes desde el backend para obtener la versión actualizada
     await fetchRequests()
     
     // Cerrar el modal después de éxito
-  showModal.value = false
+    showModal.value = false
 
     // Mostrar mensaje de éxito (opcional, puedes usar un snackbar en lugar de alert)
     console.log('✅ Solicitud creada exitosamente')
@@ -577,468 +607,6 @@ const handleNuevaSolicitud = async (solicitudBody: any) => {
     } else {
       alert(`Error al crear la solicitud:\n\n${errorMessage}`)
     }
-  }
-}
-
-const handleTestEndpoint = async () => {
-  // Verificar que el store esté inicializado
-  if (!auth.initialized) {
-    await auth.loadFromStorage()
-  }
-
-  // Obtener el token del store
-  const tokenFromStore = auth.token
-  
-  if (!tokenFromStore) {
-    console.error('❌ No hay token disponible en el store')
-    console.error('   Store state:', {
-      user: auth.user,
-      isLoggedIn: auth.isLoggedIn,
-      token: auth.token,
-      initialized: auth.initialized,
-    })
-    
-    // Intentar obtener del localStorage directamente
-    const storedAuth = localStorage.getItem('auth')
-    if (storedAuth) {
-      try {
-        const parsed = JSON.parse(storedAuth)
-        console.log('   Token en localStorage:', parsed.token ? 'Presente' : 'Ausente')
-        if (parsed.token) {
-          console.log('   Token de localStorage:', parsed.token.substring(0, 50) + '...')
-        }
-      } catch (e) {
-        console.error('   Error al leer localStorage:', e)
-      }
-    }
-    
-    alert('Error: No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.')
-    return
-  }
-
-  isTestingEndpoint.value = true
-
-  try {
-    // Usar URL base normalizada (sin /api/v1 duplicado)
-    const apiUrl = getApiBaseUrl()
-    const isDevelopment = import.meta.env.DEV
-    
-    const endpoint = isDevelopment
-      ? '/api/v1/constancias/solicitar' // Proxy de Vite (evita CORS en desarrollo)
-      : `${apiUrl}/api/v1/constancias/solicitar` // URL completa en producción
-    
-    // Body completo para "Alumno Regular" según los ejemplos proporcionados
-    const body = {
-      rutAlumno: auth.user?.email || 'TU_RUT_AQUI',
-      nombreTipoConstancia: 'Alumno Regular',
-      observacionAlumno: 'Solicito constancia para trámites universitarios.',
-      titulo1: 'El',
-      titulo3: 'alumno',
-      semestre: 'Primer Semestre 2026',
-      proposito: 'trámites universitarios',
-    }
-
-    // Limpiar el token de espacios y caracteres extra (múltiples espacios, saltos de línea, etc.)
-    const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
-    
-    if (!cleanToken) {
-      console.error('❌ Token vacío o inválido')
-      alert('Error: No hay token de autenticación disponible')
-      isTestingEndpoint.value = false
-      return
-    }
-
-    // Validar formato del token (debe empezar con "eyJ")
-    if (!cleanToken.startsWith('eyJ')) {
-      console.error('❌ Token con formato inválido')
-      console.error('   Token debe empezar con "eyJ" (JWT base64)')
-      console.error('   Token recibido (primeros 10 chars):', cleanToken.substring(0, 10))
-      alert('Error: Token con formato inválido. Debe ser un JWT válido.')
-      isTestingEndpoint.value = false
-      return
-    }
-
-    // Decodificar el token para verificar expiración y mostrar información
-    let tokenExpired = false
-    let tokenExpirationDate: Date | null = null
-    let tokenUserId: string | null = null
-    let tokenEmail: string | null = null
-    
-    try {
-      const { jwtDecode } = await import('jwt-decode')
-      const decodedToken = jwtDecode<any>(cleanToken)
-      
-      // Verificar expiración
-      if (decodedToken.exp) {
-        tokenExpirationDate = new Date(decodedToken.exp * 1000)
-        const now = new Date()
-        tokenExpired = tokenExpirationDate < now
-        
-        console.log('🔍 [JWT] Información del token:')
-        console.log('   User ID (sub):', decodedToken.sub || 'No disponible')
-        console.log('   Email:', decodedToken.email || 'No disponible')
-        console.log('   Expiración:', tokenExpirationDate.toISOString())
-        console.log('   Fecha actual:', now.toISOString())
-        console.log('   ¿Token expirado?', tokenExpired ? '❌ SÍ' : '✅ NO')
-        
-        if (tokenExpired) {
-          const minutesExpired = Math.floor((now.getTime() - tokenExpirationDate.getTime()) / 1000 / 60)
-          console.error('   ⚠️ Token expirado hace', minutesExpired, 'minutos')
-        } else {
-          const minutesUntilExpiry = Math.floor((tokenExpirationDate.getTime() - now.getTime()) / 1000 / 60)
-          console.log('   ✅ Token válido por', minutesUntilExpiry, 'minutos más')
-        }
-        
-        tokenUserId = decodedToken.sub || null
-        tokenEmail = decodedToken.email || null
-      }
-    } catch (decodeError) {
-      console.warn('⚠️ [JWT] No se pudo decodificar el token (puede ser normal si el formato es diferente):', decodeError)
-      // Continuar de todas formas, el backend validará el token
-    }
-
-    // Si el token está expirado, advertir al usuario
-    if (tokenExpired) {
-      console.error('❌ [JWT] Token expirado - El backend rechazará esta petición')
-      alert(`Error: El token de autenticación ha expirado.\n\nPor favor, cierra sesión y vuelve a iniciar sesión.`)
-      isTestingEndpoint.value = false
-      return
-    }
-
-    console.log('🔍 [Test Endpoint] Llamando al endpoint de prueba...')
-    console.log('   Modo:', isDevelopment ? 'Desarrollo (con proxy)' : 'Producción (URL completa)')
-    console.log('   URL relativa:', endpoint)
-    if (isDevelopment) {
-      // apiUrl ya está declarado arriba en el try
-      console.log('   URL completa (proxy redirige a):', apiUrl + endpoint)
-    } else {
-      console.log('   URL completa:', endpoint)
-    }
-    console.log('   Método: POST')
-    console.log('   Body:', JSON.stringify(body, null, 2))
-    console.log('   Token presente:', !!cleanToken)
-    console.log('   Token longitud:', cleanToken.length)
-    console.log('   Token formato:', cleanToken.startsWith('eyJ') ? '✅ JWT válido' : '❌ Formato inválido')
-    console.log('   Token (primeros 50 chars):', cleanToken.substring(0, 50) + '...')
-    console.log('   Token (últimos 20 chars):', '...' + cleanToken.substring(cleanToken.length - 20))
-    if (tokenExpirationDate) {
-      console.log('   Token expiración:', tokenExpirationDate.toISOString())
-      console.log('   Token expirado:', tokenExpired ? '❌ SÍ' : '✅ NO')
-    }
-    if (tokenUserId) {
-      console.log('   User ID del token:', tokenUserId)
-    }
-    if (tokenEmail) {
-      console.log('   Email del token:', tokenEmail)
-    }
-    
-    // Construir el header Authorization exactamente como en Postman
-    // Asegurar que no haya espacios extra después de "Bearer"
-    const bearerToken = `Bearer ${cleanToken}`.trim()
-    
-    // Verificar que no haya espacios extra
-    if (bearerToken.includes('  ') || bearerToken.startsWith('Bearer  ')) {
-      console.error('❌ [Headers] Hay espacios extra en el header Authorization')
-      console.error('   Header problemático:', bearerToken)
-    }
-    
-    console.log('   Header Authorization completo:', bearerToken.substring(0, 80) + '...')
-    console.log('   Header Authorization longitud:', bearerToken.length)
-    console.log('   Header Authorization sin espacios extra:', !bearerToken.includes('  ') ? '✅' : '❌')
-    
-    // Headers exactos como en Postman - asegurar que no haya valores undefined o null
-    const requestHeaders: HeadersInit = {
-      'Content-Type': 'application/json',
-      'Authorization': bearerToken,
-    }
-    
-    // Validar que los headers no tengan valores vacíos o undefined
-    Object.keys(requestHeaders).forEach(key => {
-      const value = requestHeaders[key as keyof HeadersInit]
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
-        console.error(`❌ [Headers] Header "${key}" está vacío o undefined:`, value)
-      }
-    })
-    
-    console.log('   Headers que se enviarán:', {
-      'Content-Type': requestHeaders['Content-Type'],
-      'Authorization': requestHeaders.Authorization.substring(0, 70) + '...',
-    })
-    console.log('   Comparación con Postman:')
-    console.log('     - URL:', isDevelopment ? '✅ Relativa (proxy redirige)' : '✅ Completa')
-    // apiUrl ya está declarado arriba en el try
-    console.log('     - URL destino:', isDevelopment ? apiUrl + endpoint : endpoint)
-    console.log('     - Method: ✅ POST')
-    console.log('     - Body: ✅ Correcto')
-    console.log('     - Authorization header: ✅ Bearer token presente')
-    console.log('     - Token expirado:', tokenExpired ? '❌ SÍ (causará 401)' : '✅ NO')
-    console.log('   ⚠️ Si sigue dando 401/500, verifica:')
-    console.log('     1. Token no expirado:', tokenExpired ? '❌' : '✅')
-    console.log('     2. Backend corriendo en puerto 3020')
-    console.log('     3. Backend tiene SUPABASE_JWT_SECRET configurado')
-    console.log('     4. Proxy de Vite redirige correctamente (solo en desarrollo)')
-
-    // ⚠️ IMPORTANTE: El navegador hace una petición OPTIONS (preflight) antes del POST
-    // Si el backend no tiene CORS configurado, el navegador bloquea la petición
-    const currentOrigin = window.location.origin
-    console.log('⚠️ [CORS] Información del navegador:')
-    console.log('   Origin actual:', currentOrigin)
-    console.log('   El navegador enviará una petición OPTIONS (preflight) antes del POST')
-    console.log('   El backend debe responder con headers CORS correctos')
-    console.log('   Origin permitido debe incluir:', currentOrigin)
-
-    // Verificar primero si el endpoint responde (test de conectividad)
-    console.log('🔍 [Test Endpoint] Verificando conectividad con el backend...')
-    let response: Response
-    let fetchError: unknown = null
-    
-    try {
-      const requestInit: RequestInit = {
-        method: 'POST',
-        headers: requestHeaders,
-        body: JSON.stringify(body),
-      }
-      
-      console.log('📤 [Test Endpoint] Enviando request:')
-      console.log('   URL:', endpoint)
-      console.log('   Method:', requestInit.method)
-      console.log('   Headers:', JSON.stringify(requestHeaders, null, 2))
-      console.log('   Body:', JSON.stringify(body, null, 2))
-      console.log('   RequestInit completo:', {
-        method: requestInit.method,
-        headers: requestInit.headers,
-        body: requestInit.body,
-      })
-      
-      const startTime = Date.now()
-      response = await fetch(endpoint, requestInit)
-      const requestTime = Date.now() - startTime
-      
-      console.log('📥 [Test Endpoint] Respuesta recibida:')
-      console.log('   Tiempo de respuesta:', requestTime, 'ms')
-      console.log('   Status:', response.status, response.statusText)
-      console.log('   OK:', response.ok)
-      console.log('   Type:', response.type)
-      console.log('   Redirected:', response.redirected)
-      console.log('   URL final:', response.url)
-      
-      // Analizar headers de respuesta
-      const responseHeaders: Record<string, string> = {}
-      response.headers.forEach((value, key) => {
-        responseHeaders[key] = value
-      })
-      
-      console.log('   Headers de respuesta (todos):', JSON.stringify(responseHeaders, null, 2))
-      
-      // Headers CORS específicos
-      const corsHeaders = {
-        'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
-        'access-control-allow-methods': response.headers.get('access-control-allow-methods'),
-        'access-control-allow-headers': response.headers.get('access-control-allow-headers'),
-        'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
-        'access-control-expose-headers': response.headers.get('access-control-expose-headers'),
-      }
-      
-      console.log('   Headers CORS:', JSON.stringify(corsHeaders, null, 2))
-      
-      // Verificar si CORS está configurado
-      if (!corsHeaders['access-control-allow-origin']) {
-        console.warn('⚠️ [CORS] No se encontró header Access-Control-Allow-Origin')
-        console.warn('   Esto puede indicar que CORS no está configurado en el backend')
-      } else {
-        console.log('✅ [CORS] Access-Control-Allow-Origin:', corsHeaders['access-control-allow-origin'])
-        if (corsHeaders['access-control-allow-origin'] !== '*' && corsHeaders['access-control-allow-origin'] !== currentOrigin) {
-          console.warn('⚠️ [CORS] El origen permitido no coincide con el actual')
-          console.warn('   Permitido:', corsHeaders['access-control-allow-origin'])
-          console.warn('   Actual:', currentOrigin)
-        }
-      }
-      
-    } catch (error) {
-      fetchError = error
-      console.error('❌ [Test Endpoint] Error al hacer la petición:')
-      console.error('   Tipo de error:', error?.constructor?.name)
-      console.error('   Error completo:', error)
-      console.error('   Stack:', error instanceof Error ? error.stack : 'No disponible')
-      
-      if (error instanceof TypeError) {
-        console.error('   Mensaje:', error.message)
-        console.error('   Name:', error.name)
-        
-        if (error.message.includes('Failed to fetch')) {
-          console.error('   🔴 ERROR DE CORS O RED:')
-          console.error('   - El navegador no pudo completar la petición')
-          console.error('   - Posibles causas:')
-          console.error('     1. CORS no configurado en el backend')
-          console.error('     2. El backend no responde a OPTIONS (preflight)')
-          console.error('     3. El backend está bloqueando el origen:', currentOrigin)
-          console.error('     4. Problema de red o el backend no está corriendo')
-          console.error('   Solución: El backend debe configurar CORS para permitir:', currentOrigin)
-        } else if (error.message.includes('NetworkError')) {
-          console.error('   🔴 ERROR DE RED:')
-          console.error('   - No se pudo conectar al backend')
-          console.error('   - Verifica que el backend esté corriendo en puerto 3020')
-        }
-      } else if (error instanceof DOMException) {
-        console.error('   🔴 ERROR DEL NAVEGADOR:')
-        console.error('   - Tipo:', error.name)
-        console.error('   - Mensaje:', error.message)
-      }
-      
-      alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}\n\nRevisa la consola para más detalles.`)
-      isTestingEndpoint.value = false
-      return
-    }
-
-    if (!response.ok) {
-      // Intentar leer el error de múltiples formas
-      let errorText: string = ''
-      let errorJson: any = null
-      
-      try {
-        // Primero intentar como texto
-        errorText = await response.text()
-        console.error('   Error raw (texto):', errorText)
-        
-        // Intentar parsear como JSON
-        if (errorText) {
-          try {
-            errorJson = JSON.parse(errorText)
-            console.error('   Error parseado (JSON):', JSON.stringify(errorJson, null, 2))
-          } catch {
-            // No es JSON, está bien
-            console.error('   Error no es JSON, es texto plano')
-          }
-        }
-      } catch (e) {
-        errorText = 'No se pudo leer el cuerpo de la respuesta'
-        console.error('   Error al leer el cuerpo:', e)
-      }
-      
-      console.error('❌ [Test Endpoint] Error en la respuesta:')
-      console.error('   Status:', response.status)
-      console.error('   Status Text:', response.statusText)
-      console.error('   Response type:', response.type)
-      console.error('   Response URL:', response.url)
-      console.error('   Content-Type:', response.headers.get('content-type'))
-      console.error('   Error raw:', errorText || '(vacío)')
-      console.error('   Error JSON:', errorJson || '(no es JSON)')
-
-      let errorData: any
-      try {
-        errorData = JSON.parse(errorText)
-        console.error('   Error parseado:', JSON.stringify(errorData, null, 2))
-      } catch {
-        errorData = { message: errorText, raw: errorText }
-      }
-
-      // Análisis detallado según el código de estado
-      if (response.status === 401) {
-        console.error('')
-        console.error('🔍 [Test Endpoint] ANÁLISIS DETALLADO - 401 Unauthorized:')
-        console.error('')
-        console.error('📋 CHECKLIST DE VERIFICACIÓN:')
-        console.error('')
-        console.error('1. CORS:')
-        const allowOrigin = response.headers.get('access-control-allow-origin')
-        console.error('   - Access-Control-Allow-Origin:', allowOrigin || '❌ NO PRESENTE')
-        console.error('   - Origin actual:', currentOrigin)
-        if (allowOrigin) {
-          if (allowOrigin === '*' || allowOrigin === currentOrigin) {
-            console.error('   ✅ CORS configurado correctamente')
-          } else {
-            console.error('   ❌ CORS permite otro origen:', allowOrigin)
-            console.error('   ❌ Debe permitir:', currentOrigin)
-          }
-        } else {
-          console.error('   ❌ CORS NO está configurado en el backend')
-          console.error('   ❌ El backend debe responder con Access-Control-Allow-Origin')
-        }
-        console.error('')
-        console.error('2. JWT Validation:')
-        console.error('   - Token enviado:', cleanToken ? '✅ Presente' : '❌ Ausente')
-        console.error('   - Token longitud:', cleanToken.length, 'caracteres')
-        console.error('   - Token formato:', cleanToken.startsWith('eyJ') ? '✅ JWT válido' : '❌ Formato inválido')
-        console.error('   - Header Authorization:', bearerToken.substring(0, 80) + '...')
-        console.error('   - Backend debe tener SUPABASE_JWT_SECRET configurado')
-        console.error('   - Backend debe validar con JwtStrategy')
-        console.error('')
-        console.error('3. Request Headers enviados:')
-        console.error('   ', JSON.stringify(requestHeaders, null, 2))
-        console.error('')
-        console.error('4. Response Headers recibidos:')
-        const allResponseHeaders: Record<string, string> = {}
-        response.headers.forEach((value, key) => {
-          allResponseHeaders[key] = value
-        })
-        console.error('   ', JSON.stringify(allResponseHeaders, null, 2))
-        console.error('')
-        console.error('5. Comparación con Postman:')
-        console.error('   - Postman funciona: ✅')
-        console.error('   - Frontend falla: ❌')
-        console.error('   - Diferencia: Postman no tiene restricciones CORS')
-        console.error('   - El navegador requiere CORS, Postman no')
-        console.error('')
-        console.error('💡 SOLUCIÓN:')
-        console.error('   El backend debe configurar CORS para permitir:', currentOrigin)
-        console.error('   Ejemplo en NestJS:')
-        console.error('   app.enableCors({')
-        console.error('     origin: "http://localhost:5173",')
-        console.error('     credentials: true,')
-        console.error('   })')
-      } else if (response.status === 0) {
-        console.error('🔴 ERROR: Status 0 indica que la petición fue bloqueada por CORS')
-        console.error('   El navegador bloqueó la petición antes de llegar al servidor')
-        console.error('   El backend no está respondiendo correctamente a OPTIONS (preflight)')
-      } else if (response.status >= 500) {
-        console.error('🔴 ERROR DEL SERVIDOR:', response.status)
-        console.error('   El backend tiene un error interno')
-        console.error('')
-        console.error('📋 DIAGNÓSTICO DEL ERROR 500:')
-        console.error('   1. El proxy de Vite está funcionando (CORS resuelto) ✅')
-        console.error('   2. La petición llegó al backend ✅')
-        console.error('   3. El backend está devolviendo un error 500 ❌')
-        console.error('')
-        console.error('💡 POSIBLES CAUSAS:')
-        console.error('   - El backend no puede validar el JWT')
-        console.error('   - El backend tiene un error en el endpoint')
-        console.error('   - El backend no puede acceder a la base de datos')
-        console.error('   - El backend tiene un error de configuración')
-        console.error('')
-        console.error('🔍 VERIFICAR EN EL BACKEND (puerto 3020):')
-        console.error('   - Revisar los logs del servidor backend')
-        console.error('   - Verificar que el endpoint existe y está configurado')
-        console.error('   - Verificar que el JWT se está validando correctamente')
-        console.error('   - Verificar que la base de datos está accesible')
-        console.error('')
-        console.error('📤 REQUEST ENVIADO AL BACKEND:')
-        console.error('   URL:', endpoint)
-        console.error('   Method: POST')
-        console.error('   Headers:', JSON.stringify(requestHeaders, null, 2))
-        console.error('   Body:', JSON.stringify(body, null, 2))
-        console.error('')
-        console.error('📥 RESPUESTA DEL BACKEND:')
-        console.error('   Status:', response.status)
-        console.error('   Headers:', JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2))
-        console.error('   Body:', errorText || '(vacío)')
-      }
-
-      // Usar el mensaje de error más descriptivo disponible
-      const errorMessage = errorJson?.message || errorJson?.error || errorData?.message || errorData?.msg || errorText || `Error ${response.status}: ${response.statusText}`
-      alert(`Error ${response.status}: ${errorMessage}\n\nRevisa la consola para análisis detallado.`)
-      return
-    }
-
-    const data = await response.json()
-    console.log('✅ [Test Endpoint] Respuesta exitosa:')
-    console.log('   Data:', JSON.stringify(data, null, 2))
-
-    alert(`✅ Solicitud creada exitosamente!\n\n${JSON.stringify(data, null, 2)}`)
-  } catch (error) {
-    console.error('❌ [Test Endpoint] Error en la petición:', error)
-    alert(`Error: ${error instanceof Error ? error.message : 'Error desconocido'}`)
-  } finally {
-    isTestingEndpoint.value = false
   }
 }
 </script>

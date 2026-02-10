@@ -10,7 +10,7 @@
           prepend-icon="mdi-refresh"
           :loading="isLoadingRequests"
           :disabled="isLoadingRequests || !auth.token"
-          @click="fetchRequests"
+          @click="fetchRequests({ showFeedback: true })"
         >
           Actualizar
         </v-btn>
@@ -63,6 +63,15 @@
       @back="handleBack"
       @update="handleRequestUpdate"
     />
+
+    <v-snackbar
+      v-model="snackbarOpen"
+      :color="snackbarColor"
+      :timeout="2500"
+      location="bottom"
+    >
+      {{ snackbarText }}
+    </v-snackbar>
   </div>
 </template>
 
@@ -75,12 +84,46 @@ import RequestDetail from './RequestDetail.vue'
 import { RequestStatus, UserRole } from '@/types/requestTypes'
 import type { Request, User } from '@/types/requestTypes'
 
+type BackendRequestItem = {
+  idSolicitud?: string | number
+  codigoDocumento?: string | number
+  idDocumento?: string | number
+  id_documento?: string | number
+  idConstancia?: string | number
+  documentoId?: string | number
+  documentId?: string | number
+  tipoConstancia?: { nombre?: string } | string
+  fechaSolicitud?: string
+  fechaActualizacion?: string
+  estadoActual?: string
+  nombreUsuario?: string
+  nombreEstudiante?: string
+  estudiante?: string
+  nombre?: string
+  rutAlumno?: string
+  rut?: string
+  observacionAlumno?: string
+  observaciones?: string
+  urlArchivo?: string
+  fileUrl?: string
+  documentoUrl?: string
+}
+
+type BackendResponseList = BackendRequestItem[] | { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }
+
+const readErrorField = (obj: Record<string, unknown> | null, key: string): string | undefined =>
+  obj && typeof obj[key] === 'string' ? (obj[key] as string) : undefined
+
 const auth = useAuthStore()
 
 const requests = ref<Request[]>([])
 const isLoadingRequests = ref(false)
 const requestsError = ref<string | null>(null)
 const selectedRequestId = ref<string | null>(null)
+
+const snackbarOpen = ref(false)
+const snackbarText = ref('')
+const snackbarColor = ref<'success' | 'error' | 'info'>('info')
 
 const headers = ref<VDataTable['$props']['headers']>([
   { title: 'ID SOLICITUD', key: 'id' },
@@ -244,7 +287,9 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
 }
 
 // Función para obtener las solicitudes del backend
-const fetchRequests = async () => {
+const fetchRequests = async (opts?: { showFeedback?: boolean }) => {
+  const showFeedback = opts?.showFeedback === true
+
   // Verificar que el store esté inicializado
   if (!auth.initialized) {
     await auth.loadFromStorage()
@@ -255,6 +300,11 @@ const fetchRequests = async () => {
   if (!tokenFromStore) {
     console.error('❌ No hay token disponible para obtener las solicitudes')
     requestsError.value = 'No hay token de autenticación disponible. Por favor, inicia sesión nuevamente.'
+    if (showFeedback) {
+      snackbarColor.value = 'error'
+      snackbarText.value = 'No hay sesión activa. Inicia sesión nuevamente.'
+      snackbarOpen.value = true
+    }
     return
   }
 
@@ -300,16 +350,18 @@ const fetchRequests = async () => {
 
     if (!response.ok) {
       let errorText = ''
-      let errorData: any = null
+      let errorData: Record<string, unknown> | null = null
       
       try {
         errorText = await response.text()
         try {
-          errorData = JSON.parse(errorText)
+          const parsed = JSON.parse(errorText) as unknown
+          errorData =
+            typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : { message: String(parsed) }
         } catch {
           errorData = { message: errorText }
         }
-      } catch (e) {
+      } catch {
         errorText = 'No se pudo leer el cuerpo de la respuesta'
         errorData = { message: errorText }
       }
@@ -318,8 +370,16 @@ const fetchRequests = async () => {
       console.error('   Status:', response.status)
       console.error('   Error:', JSON.stringify(errorData, null, 2))
 
-      const errorMessage = errorData.message || errorData.msg || `Error ${response.status}: ${response.statusText}`
+      const errorMessage =
+        readErrorField(errorData, 'message') ||
+        readErrorField(errorData, 'msg') ||
+        `Error ${response.status}: ${response.statusText}`
       requestsError.value = `Error al cargar las solicitudes: ${errorMessage}`
+      if (showFeedback) {
+        snackbarColor.value = 'error'
+        snackbarText.value = 'No se pudieron actualizar los datos.'
+        snackbarOpen.value = true
+      }
       return
     }
 
@@ -346,18 +406,23 @@ const fetchRequests = async () => {
 
     // Mapear la respuesta del backend al formato Request
     // El backend devuelve un array directamente con: { idSolicitud, tipoConstancia, fechaSolicitud, estadoActual, nombreUsuario, rutAlumno }
-    const backendRequests = Array.isArray(responseData) 
-      ? responseData 
-      : (responseData.data || responseData.solicitudes || [])
+    const backendRequests: BackendRequestItem[] = Array.isArray(responseData as BackendResponseList)
+      ? (responseData as BackendRequestItem[])
+      : ((responseData as { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }).data ||
+          (responseData as { data?: BackendRequestItem[]; solicitudes?: BackendRequestItem[] }).solicitudes ||
+          [])
 
     console.log('📋 [Admin Solicitudes] Mapeando solicitudes del backend:')
     console.log('   Total de solicitudes:', backendRequests.length)
     if (backendRequests.length > 0) {
-      console.log('   Primera solicitud (ejemplo):', JSON.stringify(backendRequests[0], null, 2))
-      console.log('   Campos disponibles en la primera solicitud:', Object.keys(backendRequests[0]))
+      const firstBackendRequest = backendRequests[0]
+      if (firstBackendRequest) {
+        console.log('   Primera solicitud (ejemplo):', JSON.stringify(firstBackendRequest, null, 2))
+        console.log('   Campos disponibles en la primera solicitud:', Object.keys(firstBackendRequest))
+      }
     }
 
-    const mappedRequests: Request[] = backendRequests.map((item: any, index: number) => {
+    const mappedRequests: Request[] = backendRequests.map((item, index: number) => {
       // Mapear los campos del backend al formato Request
       // El backend ahora incluye nombreUsuario (nombre formateado del usuario) y rutAlumno
       const nombreUsuario = item.nombreUsuario || item.nombreEstudiante || item.estudiante || item.nombre || null
@@ -415,10 +480,20 @@ const fetchRequests = async () => {
 
     requests.value = mappedRequests
     console.log(`✅ [Admin Solicitudes] ${mappedRequests.length} solicitudes cargadas`)
+    if (showFeedback) {
+      snackbarColor.value = 'success'
+      snackbarText.value = 'Datos actualizados.'
+      snackbarOpen.value = true
+    }
 
   } catch (error) {
     console.error('❌ [Admin Solicitudes] Error al obtener las solicitudes:', error)
     requestsError.value = `Error al cargar las solicitudes: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    if (showFeedback) {
+      snackbarColor.value = 'error'
+      snackbarText.value = 'Error al actualizar los datos.'
+      snackbarOpen.value = true
+    }
   } finally {
     isLoadingRequests.value = false
   }
@@ -426,7 +501,7 @@ const fetchRequests = async () => {
 
 // Cargar las solicitudes cuando el componente se monte
 onMounted(async () => {
-  await fetchRequests()
+  await fetchRequests({ showFeedback: false })
 })
 
 // Recargar las solicitudes cuando el usuario cambie
@@ -434,7 +509,7 @@ watch(
   () => auth.user?.email,
   async (newEmail) => {
     if (newEmail) {
-      await fetchRequests()
+      await fetchRequests({ showFeedback: false })
     }
   },
   { immediate: false },

@@ -19,15 +19,34 @@
 </script>
 
 <style>
-/* Estilos globales si los necesitas.
-  Por ejemplo, si quieres que 'Merriweather' sea la fuente
-  por defecto en TODA la app, lo pones aquí.
-*/
+:root {
+  --app-font-body: 'Lexend', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --app-font-title: 'Montserrat', 'Lexend', 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Vuetify usa esta variable como fuente base de la app */
+  --v-font-family: var(--app-font-body);
+}
+
 html,
 body,
 #app {
   height: 100%;
   margin: 0;
-  font-family: 'Merriweather', serif;
+  font-family: var(--app-font-body);
+}
+
+/* Títulos (HTML + utilidades de Vuetify) */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-h1,
+.text-h2,
+.text-h3,
+.text-h4,
+.text-h5,
+.text-h6 {
+  font-family: var(--app-font-title);
 }
 </style>

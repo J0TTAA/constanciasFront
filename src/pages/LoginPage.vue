@@ -30,7 +30,7 @@
             <!-- Título -->
             <h1
               class="text-h6 text-wrap font-weight-bold"
-              style="color: #1e5a3d; font-family: 'Merriweather', serif"
+              style="color: #1e5a3d"
             >
               Sistema de Gestión de Constancias
             </h1>
@@ -38,7 +38,7 @@
 
           <v-card-subtitle
             class="text-center text-wrap"
-            style="color: #1e5a3d; font-family: 'Merriweather', serif"
+            style="color: #1e5a3d"
           >
             Doctorado en Ciencias de Recursos Naturales
           </v-card-subtitle>
@@ -58,6 +58,8 @@
                 variant="outlined"
                 class="mb-4"
                 :disabled="isLoading"
+                :error="!!emailError"
+                :error-messages="emailError ? [emailError] : []"
                 required
                 density="comfortable"
               ></v-text-field>
@@ -71,6 +73,8 @@
                 variant="outlined"
                 class="mb-4"
                 :disabled="isLoading"
+                :error="!!passwordError"
+                :error-messages="passwordError ? [passwordError] : []"
                 required
                 density="comfortable"
               ></v-text-field>
@@ -83,7 +87,7 @@
                 size="large"
                 block
                 class="mb-3"
-                style="font-family: 'Merriweather', serif; text-transform: none; color: white"
+                style="text-transform: none; color: white"
                 type="submit"
               >
                 Ingresar
@@ -115,7 +119,7 @@
 
             <p
               class="text-center text-caption text-disabled mt-6"
-              style="font-family: 'Merriweather', serif; color: #1e5a3d"
+              style="color: #1e5a3d"
             >
               © 2025 Universidad de La Frontera. Prototipo.
             </p>
@@ -127,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { jwtDecode } from 'jwt-decode'
 import { useAuthStore } from '@/stores/auth'
@@ -140,11 +144,43 @@ const password = ref('')
 const isLoading = ref(false)
 const error = computed(() => auth.errorMessage)
 
+const emailError = ref('')
+const passwordError = ref('')
+
+type DecodedToken = {
+  sub?: string
+  email?: string
+  user_metadata?: {
+    role?: string
+    roles?: string[]
+    name?: string
+    full_name?: string
+    primer_nombre?: string
+    primer_apellido?: string
+  }
+  app_metadata?: {
+    role?: string
+    roles?: string[]
+  }
+}
+
+watch(email, () => {
+  if (emailError.value) emailError.value = ''
+})
+
+watch(password, () => {
+  if (passwordError.value) passwordError.value = ''
+})
+
 const login = async () => {
   auth.clearError()
+  emailError.value = ''
+  passwordError.value = ''
   
   if (!email.value || !password.value) {
-    auth.captureError(new Error('Por favor completa todos los campos'))
+    if (!email.value) emailError.value = 'Ingresa tu correo.'
+    if (!password.value) passwordError.value = 'Ingresa tu contraseña.'
+    auth.captureError(new Error('Completa correo y contraseña.'))
     return
   }
   
@@ -230,10 +266,16 @@ const login = async () => {
       // Mensajes de ayuda según el tipo de error
       let userFriendlyMessage = errorMessage
       
-      if (errorCode === 'invalid_credentials' || errorMessage.toLowerCase().includes('invalid login')) {
+      if (
+        errorCode === 'invalid_credentials' ||
+        errorMessage.toLowerCase().includes('invalid login') ||
+        response.status === 400 ||
+        response.status === 401
+      ) {
         console.error('   💡 Sugerencia: Verifica que el email y password sean correctos')
         console.error('   💡 Credenciales de prueba correctas:', 'admin@correo.com / password123')
-        userFriendlyMessage = 'Credenciales inválidas. Verifica tu email y contraseña.'
+        userFriendlyMessage = 'Correo o contraseña incorrectos.'
+        passwordError.value = 'Correo o contraseña incorrectos.'
       }
       
       if (response.status === 400 && !errorCode) {
@@ -272,7 +314,7 @@ const login = async () => {
     let userId: string | null = null
     
     try {
-      const decodedToken = jwtDecode<any>(token)
+      const decodedToken = jwtDecode<DecodedToken>(token)
       console.log('✅ [JWT] Token decodificado exitosamente')
       console.log('   Payload completo:', JSON.stringify(decodedToken, null, 2))
       
@@ -327,7 +369,9 @@ const login = async () => {
     
     // Mapear el rol del JWT metadata a los roles permitidos del sistema
     // El metadata puede tener: "admin", "estudiante", "secretaria", "director", etc.
-    const roleMapping: Record<string, 'Estudiante' | 'Secretaria' | 'Director' | 'Administrador'> = {
+    type AllowedRole = 'Estudiante' | 'Secretaria' | 'Director' | 'Administrador'
+
+    const roleMapping: Record<string, AllowedRole> = {
       'admin': 'Administrador',
       'administrador': 'Administrador',
       'estudiante': 'Estudiante',
@@ -337,21 +381,19 @@ const login = async () => {
       'secretaría': 'Secretaria',
       'director': 'Director',
     }
-    
-    const allowedRoles: Array<'Estudiante' | 'Secretaria' | 'Director' | 'Administrador'> = [
-      'Estudiante',
-      'Secretaria',
-      'Director',
-      'Administrador',
-    ]
+    const allowedRoleByNormalized: Record<string, AllowedRole> = {
+      estudiante: 'Estudiante',
+      secretaria: 'Secretaria',
+      secretaría: 'Secretaria',
+      director: 'Director',
+      administrador: 'Administrador',
+    }
     
     // Mapear el rol del backend al rol del sistema (case-insensitive)
     const normalizedRoleName = roleName?.toLowerCase().trim() || null
-    const mappedRole = normalizedRoleName && roleMapping[normalizedRoleName]
-      ? roleMapping[normalizedRoleName]
-      : (normalizedRoleName && allowedRoles.includes(normalizedRoleName as any)
-          ? (normalizedRoleName as 'Estudiante' | 'Secretaria' | 'Director' | 'Administrador')
-          : null)
+    const mappedRole: AllowedRole | null = normalizedRoleName
+      ? roleMapping[normalizedRoleName] || allowedRoleByNormalized[normalizedRoleName] || null
+      : null
     
     console.log('🔍 [Frontend] Procesamiento del rol:')
     console.log('   Rol del JWT metadata (raw):', roleName)
