@@ -96,6 +96,7 @@ type BackendRequestItem = {
   fechaSolicitud?: string
   fechaActualizacion?: string
   estadoActual?: string
+  historiales?: Array<{ estado?: { nombreEstado?: string } }>
   nombreUsuario?: string
   nombreEstudiante?: string
   estudiante?: string

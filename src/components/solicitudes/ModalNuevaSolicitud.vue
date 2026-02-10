@@ -137,11 +137,19 @@ const emit = defineEmits(['update:modelValue', 'submit'])
 const auth = useAuthStore()
 
 // --- Estado Interno del Formulario ---
-const form = ref<any>(null) // Referencia al v-form
+type TratamientoValue = { titulo1: string; titulo2: string }
+type CalidadValue = { titulo3: string }
+type CierreValue = { titulo4: string; titulo5: string }
+
+type VuetifyForm = {
+  validate: () => Promise<{ valid: boolean }>
+}
+
+const form = ref<VuetifyForm | null>(null) // Referencia al v-form
 const tipoConstancia = ref<string | null>(null)
-const tratamiento = ref<string | null>(null)
-const calidadAlumno = ref<string | null>(null)
-const cierreSolicitud = ref<string | null>(null)
+const tratamiento = ref<TratamientoValue | null>(null)
+const calidadAlumno = ref<CalidadValue | null>(null)
+const cierreSolicitud = ref<CierreValue | null>(null)
 const observaciones = ref('')
 const semestre = ref('')
 const proposito = ref('')
@@ -155,7 +163,16 @@ const tiposDeConstancia = [
 ]
 
 // Configuración de bodies según las especificaciones del backend
-const constanciaBodies = {
+type BaseConstanciaBody = {
+  nombreTipoConstancia: string
+  semestre?: string
+  proposito?: string
+}
+
+const constanciaBodies: Record<
+  'Alumno Regular' | 'Examen' | 'Inscripción Asignaturas',
+  { base: BaseConstanciaBody }
+> = {
   'Alumno Regular': {
     base: {
       nombreTipoConstancia: 'Alumno Regular',
@@ -163,7 +180,7 @@ const constanciaBodies = {
       proposito: 'trámites universitarios',
     },
   },
-  'Examen': {
+  Examen: {
     base: {
       nombreTipoConstancia: 'Examen',
       proposito: 'postular a la Beca Doctorado Nacional ANID',
@@ -247,9 +264,9 @@ const solicitudBody = computed(() => {
   if (!tipoConstancia.value || !tratamiento.value || !calidadAlumno.value || !cierreSolicitud.value) return null
 
   const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
-  const tratamientoBody = tratamiento.value as { titulo1: string; titulo2: string }
-  const calidadBody = calidadAlumno.value as { titulo3: string }
-  const cierreBody = cierreSolicitud.value as { titulo4: string; titulo5: string }
+  const tratamientoBody = tratamiento.value
+  const calidadBody = calidadAlumno.value
+  const cierreBody = cierreSolicitud.value
 
   // Construir el body según las especificaciones del backend
   // Nota: El backend puede obtener rutAlumno del token JWT, pero lo incluimos por si acaso
@@ -299,6 +316,10 @@ const close = () => {
 
 const submitForm = async () => {
   // 1. Validar el formulario
+  if (!form.value) {
+    console.error('❌ [Modal] El formulario no está inicializado')
+    return
+  }
   const { valid } = await form.value.validate()
   if (!valid) return
 
