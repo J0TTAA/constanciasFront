@@ -127,7 +127,6 @@ const snackbarText = ref('')
 const snackbarColor = ref<'success' | 'error' | 'info'>('info')
 
 const headers = ref<VDataTable['$props']['headers']>([
-  { title: 'ID SOLICITUD', key: 'id' },
   { title: 'ESTUDIANTE', key: 'estudiante' },
   { title: 'TIPO CONSTANCIA', key: 'tipo' },
   { title: 'FECHA SOLICITUD', key: 'fecha' },
@@ -218,8 +217,22 @@ const handleRequestUpdate = (
   appendHistory(request, newStatus, observation)
 }
 
+const normalizeEstadoForUi = (estado: string) => {
+  const raw = (estado || '').toString().trim()
+  const upper = raw.toUpperCase()
+  // Unificar variantes que llegan desde backend o UI
+  if (upper === 'EN_REVISION' || upper === 'EN REVISIÓN' || upper === 'EN REVISION' || upper === 'IN_REVIEW') {
+    return RequestStatus.IN_REVIEW
+  }
+  if (upper === 'RECHAZADA' || upper === 'RECHAZADO' || upper === 'REJECTED') {
+    return RequestStatus.REJECTED
+  }
+  return raw
+}
+
 const getStatusColor = (estado: string) => {
-  switch (estado) {
+  const normalized = normalizeEstadoForUi(estado)
+  switch (normalized) {
     case RequestStatus.SIGNED:
       return 'success'
     case RequestStatus.IN_REVIEW:
@@ -236,7 +249,8 @@ const getStatusColor = (estado: string) => {
 }
 
 const getStatusIcon = (estado: string) => {
-  switch (estado) {
+  const normalized = normalizeEstadoForUi(estado)
+  switch (normalized) {
     case RequestStatus.SIGNED:
       return 'mdi-check-circle'
     case RequestStatus.IN_REVIEW:
@@ -262,6 +276,7 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
     'SOLICITADA': RequestStatus.REQUESTED,
     'EN REVISIÓN': RequestStatus.IN_REVIEW,
     'EN REVISION': RequestStatus.IN_REVIEW,
+    'EN_REVISION': RequestStatus.IN_REVIEW, // ← formato con underscore que usa el backend
     'PARA FIRMA': RequestStatus.AWAITING_SIGNATURE,
     'FIRMADO Y DISPONIBLE': RequestStatus.SIGNED,
     'FIRMADO': RequestStatus.SIGNED,
@@ -452,11 +467,23 @@ const fetchRequests = async (opts?: { showFeedback?: boolean }) => {
         ? item.tipoConstancia.nombre
         : item.tipoConstancia
       
-      // Opción 1 (recomendada): usar estadoActual
-      // Opción 2: si estadoActual no está, usar el primer historial
-      const estadoBackend = item.estadoActual || 
-        item.historiales?.[0]?.estado?.nombreEstado || 
-        'SOLICITADA'
+      // Obtener el último estado conocido desde el backend
+      // 1) Usar estadoActual si viene seteado
+      // 2) Si no, usar el ÚLTIMO registro del arreglo de historiales (no el primero)
+      let ultimoEstadoDesdeHistorial: string | undefined
+      if (item.historiales && item.historiales.length > 0) {
+        const lastHist = item.historiales[item.historiales.length - 1]
+        const rawEstado = (lastHist as any)?.estado
+        if (rawEstado) {
+          if (typeof rawEstado === 'string') {
+            ultimoEstadoDesdeHistorial = rawEstado
+          } else if (typeof rawEstado === 'object' && rawEstado !== null) {
+            ultimoEstadoDesdeHistorial = (rawEstado as any).nombreEstado
+          }
+        }
+      }
+
+      const estadoBackend = item.estadoActual || ultimoEstadoDesdeHistorial || 'SOLICITADA'
       
       console.log(`     - estadoBackend final: ${estadoBackend}`)
       

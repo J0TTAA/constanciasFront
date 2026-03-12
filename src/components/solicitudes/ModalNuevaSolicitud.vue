@@ -30,9 +30,9 @@
           ></v-select>
 
           <!--
-            v-textarea para las Observaciones
+            Campos de título solo para constancias que los requieren
           -->
-          <template v-if="tipoConstancia">
+          <template v-if="tipoConstancia && tipoConstancia !== 'Certificado de Notas'">
             <v-label class="font-weight-medium mb-1 mt-3">Tratamiento</v-label>
             <v-select
               v-model="tratamiento"
@@ -160,6 +160,7 @@ const tiposDeConstancia = [
   'Alumno Regular',
   'Examen',
   'Inscripción Asignaturas',
+  'Certificado de Notas',
 ]
 
 // Configuración de bodies según las especificaciones del backend
@@ -170,7 +171,7 @@ type BaseConstanciaBody = {
 }
 
 const constanciaBodies: Record<
-  'Alumno Regular' | 'Examen' | 'Inscripción Asignaturas',
+  'Alumno Regular' | 'Examen' | 'Inscripción Asignaturas' | 'Certificado de Notas',
   { base: BaseConstanciaBody }
 > = {
   'Alumno Regular': {
@@ -191,6 +192,11 @@ const constanciaBodies: Record<
       nombreTipoConstancia: 'Inscripción Asignaturas',
       semestre: 'Primer Semestre de 2025',
       proposito: 'gestionar la renovación de su Beca Doctorado Nacional de ANID',
+    },
+  },
+  'Certificado de Notas': {
+    base: {
+      nombreTipoConstancia: 'Certificado de Notas',
     },
   },
 }
@@ -261,15 +267,29 @@ const cierresDisponibles = computed(() => {
 })
 
 const solicitudBody = computed(() => {
-  if (!tipoConstancia.value || !tratamiento.value || !calidadAlumno.value || !cierreSolicitud.value) return null
+  if (!tipoConstancia.value) return null
 
   const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
+
+  // Para "Certificado de Notas", solo se necesita nombreTipoConstancia y observacionAlumno
+  if (tipoConstancia.value === 'Certificado de Notas') {
+    const finalBody: Record<string, any> = {
+      nombreTipoConstancia: baseBody.nombreTipoConstancia,
+    }
+    if (observaciones.value.trim()) {
+      finalBody.observacionAlumno = observaciones.value.trim()
+    }
+    return finalBody
+  }
+
+  // Para las otras constancias, se requieren los campos de título
+  if (!tratamiento.value || !calidadAlumno.value || !cierreSolicitud.value) return null
+
   const tratamientoBody = tratamiento.value
   const calidadBody = calidadAlumno.value
   const cierreBody = cierreSolicitud.value
 
   // Construir el body según las especificaciones del backend
-  // Nota: El backend puede obtener rutAlumno del token JWT, pero lo incluimos por si acaso
   const finalBody: Record<string, any> = {
     nombreTipoConstancia: baseBody.nombreTipoConstancia,
     ...tratamientoBody,
@@ -320,6 +340,20 @@ const submitForm = async () => {
     console.error('❌ [Modal] El formulario no está inicializado')
     return
   }
+
+  // Para "Certificado de Notas", solo validar que se haya seleccionado el tipo
+  if (tipoConstancia.value === 'Certificado de Notas') {
+    if (!solicitudBody.value) {
+      console.error('❌ [Modal] No se pudo generar el body de la solicitud')
+      return
+    }
+    emit('submit', solicitudBody.value)
+    tipoConstancia.value = null
+    observaciones.value = ''
+    return
+  }
+
+  // Para las otras constancias, validar todos los campos
   const { valid } = await form.value.validate()
   if (!valid) return
 

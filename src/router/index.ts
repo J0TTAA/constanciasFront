@@ -45,11 +45,6 @@ const router = createRouter({
           component: () => import('@/pages/dashboard/AsignaturasPage.vue'),
         },
         {
-          path: 'informes',
-          name: 'dashboard-informes',
-          component: () => import('@/pages/dashboard/InformesPage.vue'),
-        },
-        {
           path: 'admin',
           name: 'dashboard-admin',
           component: () => import('@/pages/dashboard/AdminPage.vue'),

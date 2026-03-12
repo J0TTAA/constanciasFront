@@ -15,8 +15,8 @@
     >
       <v-list-item class="pa-4 d-flex justify-center">
         <v-img
-          src="/unnamed.jpg"
-          alt="Logo Sistema de Gestión de Constancias"
+          src="/images/02-logo-UFRO-blanco-vertical.png"
+          alt="Logo Universidad de La Frontera"
           class="sidebar-logo"
           width="140"
           contain
@@ -136,7 +136,6 @@ const handleLogout = async () => {
 }
 
 .sidebar-logo {
-  border-radius: 12px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 
@@ -145,6 +144,7 @@ const handleLogout = async () => {
   flex-direction: column;
   height: 100vh;
   max-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar-fixed {
@@ -159,16 +159,32 @@ const handleLogout = async () => {
   flex: 1 1 auto;
   overflow-y: auto;
   padding-bottom: 8px;
+  min-height: 0;
 }
 
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* Asegurar que el slot append quede al final */
+:deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+:deep(.v-navigation-drawer__append) {
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .dashboard-app {
   min-height: 100vh;
   display: flex;
-  background-color: #eef2f0;
+  background-color: #ffffff;
   overflow: hidden;
 }
 
@@ -176,7 +192,7 @@ const handleLogout = async () => {
   flex: 1;
   height: 100vh;
   overflow-y: auto;
-  background: linear-gradient(180deg, #f4f7f6 0%, #eef2f0 100%);
+  background: #ffffff;
   display: flex;
   align-items: flex-start;
   padding: 0;
@@ -186,5 +202,6 @@ const handleLogout = async () => {
   padding: 8px 12px;
   min-height: 100%;
   width: 100%;
+  background: #ffffff;
 }
 </style>

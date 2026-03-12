@@ -1,33 +1,21 @@
 <template>
-  <v-app>
-    <!--
-      Usamos v-main para centrar todo.
-      El gradiente ahora se aplica con una clase de CSS para más control.
-    -->
-    <v-main class="d-flex align-center justify-center pa-4 gradient-background">
+  <v-app class="login-app">
+    <v-main class="login-main gradient-background">
+      <div class="login-container">
+        <!-- Formulario de login centrado -->
+        <div class="login-center">
       <v-responsive max-width="448">
-        <!--
-          Vuetify usa v-card, que es equivalente a tu Card de React.
-          Usamos 'elevation-12' para una sombra pronunciada y 'rounded-xl'
-        -->
-        <v-card class="rounded-xl" elevation="12">
-          <!--
-            v-card-title y v-card-subtitle equivalen a tu CardHeader y CardDescription
-          -->
-          <v-card-title class="pa-6 pb-2 text-center" style="line-height: 1.4">
-            <!-- Logo -->
-            <div class="d-flex justify-center mb-5">
+            <!-- Imagen encima del formulario -->
+            <div class="login-logo-container">
               <v-img
-                src="/logoufro.png"
-                alt="Logo Sistema de Gestión de Constancias"
-                width="72"
-                height="72"
-                class="login-logo"
+                src="/images/barra-izq.png"
+                alt="Barra izquierda"
+                class="login-logo-above"
                 contain
               ></v-img>
             </div>
-
-            <!-- Título -->
+            <v-card class="rounded-xl" elevation="12">
+              <v-card-title class="pa-6 pb-2 text-center" style="line-height: 1.4">
             <h1
               class="text-h6 text-wrap font-weight-bold"
               style="color: #1e5a3d"
@@ -37,7 +25,7 @@
           </v-card-title>
 
           <v-card-subtitle
-            class="text-center text-wrap"
+                class="text-center text-wrap pb-4"
             style="color: #1e5a3d"
           >
             Doctorado en Ciencias de Recursos Naturales
@@ -125,7 +113,18 @@
             </p>
           </v-card-text>
         </v-card>
+            <!-- Imagen debajo del formulario -->
+            <div class="login-logo-container login-logo-below">
+              <v-img
+                src="/images/barra-der.png"
+                alt="Barra derecha"
+                class="login-logo-above"
+                contain
+              ></v-img>
+            </div>
       </v-responsive>
+        </div>
+      </div>
     </v-main>
   </v-app>
 </template>
@@ -449,10 +448,69 @@ const handleForgotPassword = () => {
   min-height: 100vh;
 }
 
-.login-logo {
-  border-radius: 16px;
-  padding: 8px;
+.login-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
 }
+
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.login-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.login-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.login-right-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  color: white;
+  height: 100%;
+  justify-content: space-between;
+}
+
+.login-title-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.login-logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.login-logo-below {
+  margin-bottom: 0;
+  margin-top: 24px;
+}
+
+.login-logo-above {
+  max-width: 400px;
+  width: 100%;
+  height: auto;
+}
+
 
 /* Estilos para los campos de texto - labels en mayúsculas */
 :deep(.v-field-label) {
@@ -471,5 +529,34 @@ a {
 a:hover {
   color: #1e5a3d !important;
   text-decoration: underline !important;
+}
+</style>
+
+<style>
+/* Estilos globales para el v-app en login */
+.login-app {
+  background: #1e5a3d !important;
+  min-height: 100vh;
+}
+
+.login-app .v-main {
+  background: #1e5a3d !important;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .login-logo-above {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .login-main {
+    padding: 16px;
+  }
+
+  .login-logo-above {
+    max-width: 100%;
+  }
 }
 </style>

@@ -42,15 +42,6 @@ export const useAuthStore = defineStore('auth', {
         })
       }
 
-      // Links para Secretaria, Director y Admin
-      if (['Secretaria', 'Director', 'Administrador'].includes(role)) {
-        links.push({
-          title: 'Informes ANID',
-          icon: 'mdi-chart-bar',
-          to: '/dashboard/informes',
-        })
-      }
-
       // Link solo para Administrador
       if (role === 'Administrador') {
         links.push({

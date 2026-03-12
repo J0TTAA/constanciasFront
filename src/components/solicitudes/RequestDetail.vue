@@ -31,19 +31,15 @@
           class="wide-card"
         />
         <ActionPanelSecretary
-          v-if="
-            user.role === UserRole.SECRETARY &&
-            [RequestStatus.REQUESTED, RequestStatus.IN_REVIEW, RequestStatus.AWAITING_SIGNATURE].includes(request.status)
-          "
+          v-if="user.role === UserRole.SECRETARY"
           :request="request"
           @update="handleUpdate"
         />
         <ActionPanelDirector
-          v-if="
-            user.role === UserRole.DIRECTOR && request.status === RequestStatus.AWAITING_SIGNATURE
-          "
+          v-if="user.role === UserRole.DIRECTOR"
           :request="request"
-          @sign="handleSign"
+          :secretary-note="latestSecretaryNote"
+          @update="handleUpdate"
         />
       </div>
     </div>
@@ -86,6 +82,7 @@ const mapBackendStatusToRequestStatus = (backendStatus: string): RequestStatus =
     'SOLICITADA': RequestStatus.REQUESTED,
     'EN REVISIÓN': RequestStatus.IN_REVIEW,
     'EN REVISION': RequestStatus.IN_REVIEW,
+    'EN_REVISION': RequestStatus.IN_REVIEW, // ← formato con underscore que usa el backend
     'PARA FIRMA': RequestStatus.AWAITING_SIGNATURE,
     'FIRMADO Y DISPONIBLE': RequestStatus.SIGNED,
     'FIRMADO': RequestStatus.SIGNED,
@@ -188,11 +185,21 @@ const loadFullHistory = async () => {
         }
       }
 
+      // Determinar el nombre del estado (puede venir como string o como objeto con nombreEstado)
+      let estadoNombre: string = 'SOLICITADA'
+      if (item.estado) {
+        if (typeof item.estado === 'string') {
+          estadoNombre = item.estado
+        } else if (typeof item.estado === 'object' && item.estado !== null) {
+          estadoNombre = item.estado.nombreEstado || 'SOLICITADA'
+        }
+      }
+
       return {
         id: `hist-${index}`,
         date: item.fechaCambio || new Date().toISOString(),
         user: userName,
-        status: mapBackendStatusToRequestStatus(item.estado || 'SOLICITADA'),
+        status: mapBackendStatusToRequestStatus(estadoNombre),
         observation: item.detalle || 'Sin detalle',
       }
     })
@@ -225,14 +232,14 @@ const onBack = () => {
 }
 
 const handleUpdate = (id: string, newStatus: RequestStatus, observation: string) => {
-  // Este evento viene del ActionPanelSecretary
+  // Este evento viene del ActionPanelSecretary o del ActionPanelDirector
   emit('update', id, newStatus, observation)
 }
 
-const handleSign = (id: string, observation: string, fileUrl: string) => {
-  // Este evento viene del ActionPanelDirector
-  emit('update', id, RequestStatus.SIGNED, observation, fileUrl)
-}
+// Nota más reciente (primera del historial, ya viene ordenado DESC)
+const latestSecretaryNote = computed(() =>
+  fullHistory.value.length > 0 ? fullHistory.value[0].observation : 'Sin detalle',
+)
 </script>
 
 <style scoped>

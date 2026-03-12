@@ -120,21 +120,61 @@ const onDownload = async () => {
       return
     }
 
+    // Obtener el Content-Type antes de crear el blob
+    const contentType = response.headers.get('Content-Type') || ''
+    console.log('   Content-Type:', contentType)
+
     // Crear un blob con la respuesta
     const blob = await response.blob()
     console.log('   Blob creado:', blob.type, blob.size, 'bytes')
+
+    // Obtener el nombre del archivo del header Content-Disposition
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let fileName = `constancia-firmada-${props.request.id}`
+    
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        // Remover comillas si las hay y decodificar si está codificado
+        fileName = fileNameMatch[1].replace(/['"]/g, '')
+        // Decodificar si está en formato UTF-8 (filename*=UTF-8''...)
+        if (fileName.startsWith("UTF-8''")) {
+          fileName = decodeURIComponent(fileName.replace("UTF-8''", ''))
+        }
+        console.log('   Nombre de archivo del header:', fileName)
+      }
+    }
+    
+    // Si no hay nombre en el header o no tiene extensión, detectar desde Content-Type
+    if (!fileName.includes('.')) {
+      const finalContentType = contentType || blob.type
+      if (finalContentType.includes('pdf') || finalContentType === 'application/pdf') {
+        fileName += '.pdf'
+      } else if (finalContentType.includes('wordprocessingml') || finalContentType.includes('msword') || finalContentType.includes('document')) {
+        fileName += '.docx'
+      } else {
+        // Por defecto, usar PDF si el blob es PDF
+        if (blob.type.includes('pdf')) {
+          fileName += '.pdf'
+        } else {
+          fileName += '.pdf' // El backend devuelve PDF por defecto
+        }
+      }
+    }
+
+    console.log('   Nombre de archivo final:', fileName)
 
     // Crear un enlace temporal para descargar
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `constancia-firmada-${props.request.id}.docx`
+    link.download = fileName
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
-    console.log('✅ [Descarga Estudiante] Documento DOCX firmado descargado exitosamente')
+    console.log('✅ [Descarga Estudiante] Documento descargado exitosamente:', fileName)
 
   } catch (error) {
     console.error('❌ [Descarga Estudiante] Error al descargar el documento:', error)

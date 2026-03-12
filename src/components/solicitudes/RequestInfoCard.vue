@@ -2,7 +2,6 @@
   <div class="info-card">
     <div class="info-card__header">
       <div>
-        <p class="info-card__id">{{ request.id }}</p>
         <h2 class="info-card__title">{{ request.type }}</h2>
       </div>
       <StatusBadge :status="request.status" />
@@ -61,7 +60,7 @@
     <div v-if="showPdfViewer" class="info-card__pdf-viewer mt-4">
       <div class="pdf-viewer-header d-flex justify-space-between align-center pa-3" style="background: #f5f5f5; border-radius: 8px 8px 0 0;">
         <span class="font-weight-bold">
-          Previsualización {{ isDocx ? 'DOCX' : 'PDF' }} - Solicitud {{ request.id }}
+          Previsualización {{ isDocx ? 'DOCX' : 'PDF' }}
         </span>
         <div class="d-flex gap-2">
           <v-btn
@@ -625,21 +624,61 @@ const handleDownloadOriginal = async () => {
       return
     }
 
+    // Obtener el Content-Type antes de crear el blob
+    const contentType = response.headers.get('Content-Type') || ''
+    console.log('   Content-Type:', contentType)
+
     // Crear un blob con la respuesta
     const blob = await response.blob()
     console.log('   Blob creado:', blob.type, blob.size, 'bytes')
+
+    // Obtener el nombre del archivo del header Content-Disposition
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let fileName = `constancia-${props.request.id}`
+    
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+      if (fileNameMatch && fileNameMatch[1]) {
+        // Remover comillas si las hay y decodificar si está codificado
+        fileName = fileNameMatch[1].replace(/['"]/g, '')
+        // Decodificar si está en formato UTF-8 (filename*=UTF-8''...)
+        if (fileName.startsWith("UTF-8''")) {
+          fileName = decodeURIComponent(fileName.replace("UTF-8''", ''))
+        }
+        console.log('   Nombre de archivo del header:', fileName)
+      }
+    }
+    
+    // Si no hay nombre en el header o no tiene extensión, detectar desde Content-Type
+    if (!fileName.includes('.')) {
+      const finalContentType = contentType || blob.type
+      if (finalContentType.includes('pdf') || finalContentType === 'application/pdf') {
+        fileName += '.pdf'
+      } else if (finalContentType.includes('wordprocessingml') || finalContentType.includes('msword') || finalContentType.includes('document')) {
+        fileName += '.docx'
+      } else {
+        // Por defecto, usar PDF si el blob es PDF
+        if (blob.type.includes('pdf')) {
+          fileName += '.pdf'
+        } else {
+          fileName += '.pdf' // El backend devuelve PDF por defecto
+        }
+      }
+    }
+
+    console.log('   Nombre de archivo final:', fileName)
 
     // Crear un enlace temporal para descargar
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `solicitud-${props.request.id}.docx`
+    link.download = fileName
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
-    console.log('✅ [Descarga] Documento DOCX descargado exitosamente')
+    console.log('✅ [Descarga] Documento descargado exitosamente:', fileName)
 
   } catch (error) {
     console.error('❌ [Descarga] Error al descargar el documento:', error)
@@ -688,14 +727,6 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-}
-
-.info-card__id {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e5a3d;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .info-card__title {
