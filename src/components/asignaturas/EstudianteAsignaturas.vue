@@ -78,6 +78,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { jwtDecode } from 'jwt-decode'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import type { VDataTable } from 'vuetify/components'
@@ -105,6 +106,12 @@ const selectedEstado = ref('Todos')
 const selectedSemestre = ref('Todos')
 
 const estadoOptions = ['Todos', 'Aprobada', 'En Curso', 'Reprobada']
+
+type DecodedToken = {
+  user_metadata?: { rut?: string }
+  app_metadata?: { rut?: string }
+  rut?: string
+}
 const semestreOptions = computed(() => {
   const semestres = new Set<string>()
   asignaturas.value.forEach((asig) => {
@@ -171,8 +178,7 @@ const fetchNotas = async () => {
     let studentRut: string | null = null
     
     try {
-      const jwtDecode = (await import('jwt-decode')).default
-      const decodedToken: any = jwtDecode(cleanToken)
+      const decodedToken = jwtDecode<DecodedToken>(cleanToken)
       
       // Buscar RUT en diferentes ubicaciones del metadata
       if (decodedToken.user_metadata?.rut) {

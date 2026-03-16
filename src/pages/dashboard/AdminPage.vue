@@ -459,6 +459,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { VDataTable } from 'vuetify/components'
 import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import UserDetailView from '@/components/users/UserDetailView.vue'
@@ -642,7 +643,7 @@ const itemsPerPage = ref(6)
 
 const statusOptions = ['Todos', 'Activo', 'Inactivo']
 
-const headers = [
+const headers: VDataTable['$props']['headers'] = [
   { title: 'USUARIO', key: 'usuario', sortable: false },
   { title: 'RUT', key: 'rut', sortable: true },
   { title: 'MATRÍCULA', key: 'matricula', sortable: true },

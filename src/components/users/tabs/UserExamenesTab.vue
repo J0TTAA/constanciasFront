@@ -217,6 +217,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog.vue'
@@ -439,7 +440,7 @@ watch(() => props.userRut, () => {
   }
 })
 
-const headers = [
+const headers: VDataTable['$props']['headers'] = [
   { title: 'TIPO', key: 'tipo', sortable: true },
   { title: 'FECHA Y HORA', key: 'fechaHora', sortable: true },
   { title: 'ESTADO', key: 'estado', sortable: true },

@@ -194,6 +194,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 
@@ -513,7 +514,7 @@ watch(() => props.userRut, () => {
   }
 })
 
-const headers = [
+const headers: VDataTable['$props']['headers'] = [
   { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'ASIGNATURA', key: 'nombre', sortable: true },
   { title: 'CRÉDITOS', key: 'creditos', sortable: true },
