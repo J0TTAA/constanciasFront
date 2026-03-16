@@ -160,10 +160,27 @@ const fetchAsignaturas = async () => {
       throw new Error(`Error ${response.status}: ${errorData.message || errorText}`)
     }
 
-    const data = await response.json()
-    
+    const rawData = await response.json()
+
+    // Normalizar la respuesta del backend a siempre un arreglo
+    // En algunos entornos puede venir como { data: [...] } u otro envoltorio
+    let dataArray: any[] = []
+
+    if (Array.isArray(rawData)) {
+      dataArray = rawData
+    } else if (rawData && Array.isArray((rawData as any).data)) {
+      dataArray = (rawData as any).data
+    } else if (rawData && Array.isArray((rawData as any).items)) {
+      dataArray = (rawData as any).items
+    } else {
+      console.error('Formato de datos inesperado al cargar asignaturas:', rawData)
+      asignaturas.value = []
+      error.value = 'El servidor devolvió un formato de datos inesperado al cargar las asignaturas.'
+      return
+    }
+
     // Mapear los datos del backend al formato esperado por la tabla
-    asignaturas.value = data.map((asig: any) => ({
+    asignaturas.value = dataArray.map((asig: any) => ({
       codigo: asig.codAsignatura,
       nombre: asig.nombreAsignatura,
       nivel: asig.nivel || 'N/A',
