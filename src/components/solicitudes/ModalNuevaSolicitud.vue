@@ -52,8 +52,8 @@
             <v-text-field
               v-model="semestre"
               variant="outlined"
-              placeholder="Ej: Primer Semestre de 2025"
-              hint="Ejemplo: Primer Semestre de 2025"
+              placeholder="Ej: Nivel 1"
+              hint="Ejemplo: Nivel 1 o Nivel II"
               persistent-hint
               class="mb-3"
             ></v-text-field>
@@ -164,7 +164,8 @@ const constanciaBodies: Record<'Alumno Regular' | 'Examen' | 'Inscripción Asign
   'Inscripción Asignaturas': {
     base: {
       nombreTipoConstancia: 'Inscripción Asignaturas',
-      semestre: 'Primer Semestre de 2025',
+      // Para que el backend filtre por nivel, el texto debe incluir "Nivel"
+      semestre: 'Nivel 1',
       proposito: 'gestionar la renovación de su Beca Doctorado Nacional de ANID',
     },
   },
@@ -234,6 +235,20 @@ const buildTitulos = (tipo: string, generoSeleccionado: Genero | null): Titulos 
   return null
 }
 
+const normalizeSemestreForBackend = (value: string): string => {
+  const trimmed = value.trim()
+  if (!trimmed) return trimmed
+
+  // Si el usuario ingresa solo número, convertirlo a "Nivel X"
+  if (trimmed === '1') return 'Nivel 1'
+  if (trimmed === '2') return 'Nivel 2'
+
+  // Si ya viene como "Nivel ..." no lo tocamos
+  if (/^nivel\s+/i.test(trimmed)) return trimmed
+
+  return trimmed
+}
+
 const solicitudBody = computed(() => {
   if (!tipoConstancia.value) return null
 
@@ -286,7 +301,7 @@ const solicitudBody = computed(() => {
   // Si el usuario ingresó valores personalizados para "Inscripción Asignaturas", usar esos
   if (tipoConstancia.value === 'Inscripción Asignaturas') {
     if (semestre.value.trim()) {
-      finalBody.semestre = semestre.value.trim()
+      finalBody.semestre = normalizeSemestreForBackend(semestre.value)
     }
     if (proposito.value.trim()) {
       finalBody.proposito = proposito.value.trim()
