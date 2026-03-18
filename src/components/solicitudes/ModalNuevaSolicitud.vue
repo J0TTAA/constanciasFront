@@ -254,36 +254,32 @@ const solicitudBody = computed(() => {
 
   const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
 
-  // Para "Certificado de Notas", se necesitan títulos (según template) + opcional observación
-  if (tipoConstancia.value === 'Certificado de Notas') {
-    const titulos = buildTitulos(tipoConstancia.value, genero.value as Genero | null)
-    if (!titulos) return null
+  const titulos = buildTitulos(tipoConstancia.value, genero.value as Genero | null)
+  if (!titulos) return null
 
+  // Construimos el body con una lista explícita de campos.
+  // Esto evita enviar propiedades extra (p.ej. `titulo7`) que el backend rechaza para otros tipos.
+  if (tipoConstancia.value === 'Certificado de Notas') {
     const finalBody: Record<string, any> = {
       nombreTipoConstancia: baseBody.nombreTipoConstancia,
-      ...titulos,
     }
+
+    ;(['titulo1', 'titulo3', 'titulo4', 'titulo5', 'titulo7'] as const).forEach((k) => {
+      if (titulos[k] !== undefined) finalBody[k] = titulos[k]
+    })
 
     if (observaciones.value.trim()) finalBody.observacionAlumno = observaciones.value.trim()
     return finalBody
   }
 
-  // Para las otras constancias, se requieren los campos de título
-  const titulos = buildTitulos(tipoConstancia.value, genero.value as Genero | null)
-  if (!titulos) return null
-
-  // Construir el body según las especificaciones del backend
+  // Para las otras constancias (Alumno Regular / Examen / Inscripción Asignaturas)
   const finalBody: Record<string, any> = {
     nombreTipoConstancia: baseBody.nombreTipoConstancia,
-    ...titulos,
   }
 
-  // El backend valida esquemas distintos por tipo.
-  // Aseguramos que propiedades exclusivas de "Certificado de Notas"
-  // (como `titulo7`) NO se envíen en otros tipos.
-  if (tipoConstancia.value !== 'Certificado de Notas' && 'titulo7' in finalBody) {
-    delete finalBody.titulo7
-  }
+  ;(['titulo1', 'titulo2', 'titulo3', 'titulo4', 'titulo5'] as const).forEach((k) => {
+    if (titulos[k] !== undefined) finalBody[k] = titulos[k]
+  })
 
   // Agregar observacionAlumno si el usuario la proporcionó
   if (observaciones.value.trim()) {
