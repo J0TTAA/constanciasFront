@@ -30,41 +30,17 @@
           ></v-select>
 
           <!--
-            Campos de título solo para constancias que los requieren
+            Denominación (Hombre / Mujer) para rellenar automáticamente los títulos
           -->
-          <template v-if="tipoConstancia && tipoConstancia !== 'Certificado de Notas'">
-            <v-label class="font-weight-medium mb-1 mt-3">Tratamiento</v-label>
+          <template v-if="tipoConstancia">
+            <v-label class="font-weight-medium mb-1 mt-3">Denominación</v-label>
             <v-select
-              v-model="tratamiento"
-              :items="tratamientosDisponibles"
+              v-model="genero"
+              :items="generoOptions"
               item-title="label"
               item-value="value"
               variant="outlined"
-              placeholder="Seleccione una opción"
-              :rules="[rules.required]"
-              class="mb-3"
-            ></v-select>
-
-            <v-label class="font-weight-medium mb-1">Calidad</v-label>
-            <v-select
-              v-model="calidadAlumno"
-              :items="calidadesDisponibles"
-              item-title="label"
-              item-value="value"
-              variant="outlined"
-              placeholder="Seleccione una opción"
-              :rules="[rules.required]"
-              class="mb-3"
-            ></v-select>
-
-            <v-label class="font-weight-medium mb-1">Cierre</v-label>
-            <v-select
-              v-model="cierreSolicitud"
-              :items="cierresDisponibles"
-              item-title="label"
-              item-value="value"
-              variant="outlined"
-              placeholder="Seleccione una opción"
+              placeholder="Seleccione hombre o mujer"
               :rules="[rules.required]"
               class="mb-4"
             ></v-select>
@@ -137,9 +113,7 @@ const emit = defineEmits(['update:modelValue', 'submit'])
 const auth = useAuthStore()
 
 // --- Estado Interno del Formulario ---
-type TratamientoValue = { titulo1: string; titulo2: string }
-type CalidadValue = { titulo3: string }
-type CierreValue = { titulo4: string; titulo5: string }
+type Genero = 'Masculino' | 'Femenino'
 
 type VuetifyForm = {
   validate: () => Promise<{ valid: boolean }>
@@ -147,9 +121,7 @@ type VuetifyForm = {
 
 const form = ref<VuetifyForm | null>(null) // Referencia al v-form
 const tipoConstancia = ref<string | null>(null)
-const tratamiento = ref<TratamientoValue | null>(null)
-const calidadAlumno = ref<CalidadValue | null>(null)
-const cierreSolicitud = ref<CierreValue | null>(null)
+const genero = ref<Genero | null>(null)
 const observaciones = ref('')
 const semestre = ref('')
 const proposito = ref('')
@@ -163,6 +135,11 @@ const tiposDeConstancia = [
   'Certificado de Notas',
 ]
 
+const generoOptions: Array<{ label: string; value: Genero }> = [
+  { label: 'Hombre', value: 'Masculino' },
+  { label: 'Mujer', value: 'Femenino' },
+]
+
 // Configuración de bodies según las especificaciones del backend
 type BaseConstanciaBody = {
   nombreTipoConstancia: string
@@ -170,10 +147,7 @@ type BaseConstanciaBody = {
   proposito?: string
 }
 
-const constanciaBodies: Record<
-  'Alumno Regular' | 'Examen' | 'Inscripción Asignaturas' | 'Certificado de Notas',
-  { base: BaseConstanciaBody }
-> = {
+const constanciaBodies: Record<'Alumno Regular' | 'Examen' | 'Inscripción Asignaturas' | 'Certificado de Notas', { base: BaseConstanciaBody }> = {
   'Alumno Regular': {
     base: {
       nombreTipoConstancia: 'Alumno Regular',
@@ -201,100 +175,92 @@ const constanciaBodies: Record<
   },
 }
 
-const opcionesPorConstancia = {
-  'Alumno Regular': {
-    tratamientos: [
-      { label: 'la Srta.', value: { titulo1: 'la Srta.', titulo2: '' } },
-      { label: 'el Sr.', value: { titulo1: 'el Sr.', titulo2: '' } },
-      { label: 'la alumna', value: { titulo1: 'la alumna', titulo2: '' } },
-      { label: 'el alumno', value: { titulo1: 'el alumno', titulo2: '' } },
-    ],
-    calidades: [
-      { label: 'alumna', value: { titulo3: 'alumna' } },
-      { label: 'alumno', value: { titulo3: 'alumno' } },
-    ],
-    cierres: [
-      { label: 'de la interesada', value: { titulo4: 'de la', titulo5: 'interesada' } },
-      { label: 'del interesado', value: { titulo4: 'del', titulo5: 'interesado' } },
-      { label: 'de la estudiante', value: { titulo4: 'de la', titulo5: 'estudiante' } },
-    ],
-  },
-  'Examen': {
-    tratamientos: [
-      { label: 'la Srta.', value: { titulo1: 'la Srta.', titulo2: '' } },
-      { label: 'el Sr.', value: { titulo1: 'el Sr.', titulo2: '' } },
-    ],
-    calidades: [
-      { label: 'alumna', value: { titulo3: 'alumna' } },
-      { label: 'alumno', value: { titulo3: 'alumno' } },
-    ],
-    cierres: [
-      { label: 'de la estudiante', value: { titulo4: 'de la', titulo5: 'estudiante' } },
-      { label: 'del estudiante', value: { titulo4: 'del', titulo5: 'estudiante' } },
-    ],
-  },
-  'Inscripción Asignaturas': {
-    tratamientos: [
-      { label: 'la alumna', value: { titulo1: 'la alumna', titulo2: '' } },
-      { label: 'el alumno', value: { titulo1: 'el alumno', titulo2: '' } },
-      { label: 'La', value: { titulo1: 'La', titulo2: '' } },
-      { label: 'El', value: { titulo1: 'El', titulo2: '' } },
-    ],
-    calidades: [
-      { label: 'alumna', value: { titulo3: 'alumna' } },
-      { label: 'alumno', value: { titulo3: 'alumno' } },
-    ],
-    cierres: [
-      { label: 'de la interesada', value: { titulo4: 'de la', titulo5: 'interesada' } },
-      { label: 'del interesado', value: { titulo4: 'del', titulo5: 'interesado' } },
-    ],
-  },
+type Titulos = Partial<{
+  titulo1: string
+  titulo2: string
+  titulo3: string
+  titulo4: string
+  titulo5: string
+  titulo7: string
+}>
+
+// Helper para construir títulos según tipo de constancia y género (mapeo oficial)
+const buildTitulos = (tipo: string, generoSeleccionado: Genero | null): Titulos | null => {
+  if (!generoSeleccionado) return null
+
+  const esMujer = generoSeleccionado === 'Femenino'
+
+  if (tipo === 'Alumno Regular') {
+    return {
+      titulo1: esMujer ? 'la Srta.' : 'el Sr.',
+      titulo2: '',
+      titulo3: esMujer ? 'alumna' : 'alumno',
+      titulo4: esMujer ? 'de la' : 'del',
+      titulo5: esMujer ? 'interesada' : 'interesado',
+    }
+  }
+
+  if (tipo === 'Examen') {
+    return {
+      titulo1: esMujer ? 'la Srta.' : 'el Sr.',
+      titulo2: '',
+      titulo3: esMujer ? 'alumna' : 'alumno',
+      titulo4: esMujer ? 'de la' : 'del',
+      titulo5: 'estudiante',
+    }
+  }
+
+  if (tipo === 'Inscripción Asignaturas') {
+    return {
+      titulo1: esMujer ? 'la' : 'el',
+      titulo2: esMujer ? 'alumna' : 'alumno',
+      titulo3: esMujer ? 'alumna' : 'alumno',
+      titulo4: esMujer ? 'de la' : 'del',
+      titulo5: esMujer ? 'interesada' : 'interesado',
+    }
+  }
+
+  if (tipo === 'Certificado de Notas') {
+    return {
+      titulo1: esMujer ? 'La' : 'El',
+      titulo3: esMujer ? 'alumna' : 'alumno',
+      titulo4: esMujer ? 'de la' : 'del',
+      titulo5: esMujer ? 'interesada' : 'interesado',
+      // Pronombre usado en el template (solo definido para femenino en tu tabla)
+      titulo7: esMujer ? 'ella' : 'él',
+    }
+  }
+
+  return null
 }
-
-const tratamientosDisponibles = computed(() => {
-  if (!tipoConstancia.value) return []
-  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].tratamientos
-})
-
-const calidadesDisponibles = computed(() => {
-  if (!tipoConstancia.value) return []
-  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].calidades
-})
-
-const cierresDisponibles = computed(() => {
-  if (!tipoConstancia.value) return []
-  return opcionesPorConstancia[tipoConstancia.value as keyof typeof opcionesPorConstancia].cierres
-})
 
 const solicitudBody = computed(() => {
   if (!tipoConstancia.value) return null
 
   const baseBody = constanciaBodies[tipoConstancia.value as keyof typeof constanciaBodies].base
 
-  // Para "Certificado de Notas", solo se necesita nombreTipoConstancia y observacionAlumno
+  // Para "Certificado de Notas", se necesitan títulos (según template) + opcional observación
   if (tipoConstancia.value === 'Certificado de Notas') {
+    const titulos = buildTitulos(tipoConstancia.value, genero.value as Genero | null)
+    if (!titulos) return null
+
     const finalBody: Record<string, any> = {
       nombreTipoConstancia: baseBody.nombreTipoConstancia,
+      ...titulos,
     }
-    if (observaciones.value.trim()) {
-      finalBody.observacionAlumno = observaciones.value.trim()
-    }
+
+    if (observaciones.value.trim()) finalBody.observacionAlumno = observaciones.value.trim()
     return finalBody
   }
 
   // Para las otras constancias, se requieren los campos de título
-  if (!tratamiento.value || !calidadAlumno.value || !cierreSolicitud.value) return null
-
-  const tratamientoBody = tratamiento.value
-  const calidadBody = calidadAlumno.value
-  const cierreBody = cierreSolicitud.value
+  const titulos = buildTitulos(tipoConstancia.value, genero.value as Genero | null)
+  if (!titulos) return null
 
   // Construir el body según las especificaciones del backend
   const finalBody: Record<string, any> = {
     nombreTipoConstancia: baseBody.nombreTipoConstancia,
-    ...tratamientoBody,
-    ...calidadBody,
-    ...cierreBody,
+    ...titulos,
   }
 
   // Agregar observacionAlumno si el usuario la proporcionó
@@ -367,17 +333,13 @@ const submitForm = async () => {
 
   // 3. Limpiar campos (el modal se cerrará desde el componente padre después de la respuesta)
   tipoConstancia.value = null
-  tratamiento.value = null
-  calidadAlumno.value = null
-  cierreSolicitud.value = null
+  genero.value = null
   observaciones.value = ''
   semestre.value = ''
   proposito.value = ''
 }
 
 watch(tipoConstancia, () => {
-  tratamiento.value = null
-  calidadAlumno.value = null
-  cierreSolicitud.value = null
+  genero.value = null
 })
 </script>
