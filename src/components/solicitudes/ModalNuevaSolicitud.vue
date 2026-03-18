@@ -49,14 +49,17 @@
           <!-- Campos específicos para "Inscripción Asignaturas" -->
           <template v-if="tipoConstancia === 'Inscripción Asignaturas'">
             <v-label class="font-weight-medium mb-1">Semestre</v-label>
-            <v-text-field
+            <v-select
               v-model="semestre"
               variant="outlined"
-              placeholder="Ej: Nivel 1"
-              hint="Ejemplo: Nivel 1 o Nivel II"
+              :items="nivelesSemestre"
+              item-title="label"
+              item-value="value"
+              placeholder="Seleccione nivel"
+              hint="Solo Nivel 1 o Nivel 2"
               persistent-hint
               class="mb-3"
-            ></v-text-field>
+            ></v-select>
 
             <v-label class="font-weight-medium mb-1">Propósito</v-label>
             <v-text-field
@@ -138,6 +141,11 @@ const tiposDeConstancia = [
 const generoOptions: Array<{ label: string; value: Genero }> = [
   { label: 'Hombre', value: 'Masculino' },
   { label: 'Mujer', value: 'Femenino' },
+]
+
+const nivelesSemestre: Array<{ label: string; value: string }> = [
+  { label: 'Nivel 1', value: 'Nivel 1' },
+  { label: 'Nivel 2', value: 'Nivel 2' },
 ]
 
 // Configuración de bodies según las especificaciones del backend

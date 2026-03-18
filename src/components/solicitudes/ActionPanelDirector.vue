@@ -28,7 +28,22 @@
         density="comfortable"
         variant="outlined"
         :disabled="isUpdating"
-      />
+      >
+        <template #item="{ props, item }">
+          <v-list-item
+            v-bind="props"
+            :title="item.raw.label"
+            :prepend-icon="item.raw.icon"
+          />
+        </template>
+
+        <template #selection="{ item }">
+          <div class="d-flex align-center gap-2">
+            <v-icon v-if="item.raw.icon" size="small" :icon="item.raw.icon" />
+            <span>{{ item.raw.label }}</span>
+          </div>
+        </template>
+      </v-select>
     </div>
 
     <v-alert v-if="signError" type="error" variant="tonal" density="comfortable">
@@ -104,7 +119,12 @@ const secretaryNoteToShow = computed(
 const mapStatusToBackend = (status: any): string => {
   if (!status) return 'SOLICITADA'
 
-  if (status === 'SOLICITADA' || status === 'EN_REVISION' || status === 'FIRMADA') {
+  if (
+    status === 'SOLICITADA' ||
+    status === 'EN_REVISION' ||
+    status === 'FIRMADA' ||
+    status === 'RECHAZADA'
+  ) {
     return status
   }
 
@@ -116,6 +136,10 @@ const mapStatusToBackend = (status: any): string => {
   }
   if (status === 'Firmada' || status === RequestStatus.SIGNED) {
     return 'FIRMADA'
+  }
+
+  if (status === 'Rechazada' || status === 'Rechazado' || status === RequestStatus.REJECTED) {
+    return 'RECHAZADA'
   }
 
   return 'SOLICITADA'
@@ -132,6 +156,7 @@ const statusOptions = [
   { label: 'Solicitada', value: 'SOLICITADA' },
   { label: 'En Revisión', value: 'EN_REVISION' },
   { label: 'Firmada', value: 'FIRMADA' },
+  { label: 'Rechazada', value: 'RECHAZADA', icon: 'mdi-close-circle' },
 ]
 
 // ID de documento a usar al firmar (si existe), si no la solicitud
