@@ -554,7 +554,11 @@ const handleNuevaSolicitud = async (solicitudBody: NuevaSolicitudBody) => {
     console.log('📤 [Nueva Solicitud] Enviando solicitud al backend...')
     console.log('   Tipo de constancia:', solicitudBody.nombreTipoConstancia)
     console.log('   Endpoint:', endpoint)
-    console.log('   Body:', JSON.stringify(solicitudBody, null, 2))
+    // Sanitizar el body antes de enviar para evitar propiedades no permitidas
+    const sanitizedSolicitudBody: any = { ...solicitudBody }
+    if ('titulo7' in sanitizedSolicitudBody) delete sanitizedSolicitudBody.titulo7
+
+    console.log('   Body:', JSON.stringify(sanitizedSolicitudBody, null, 2))
 
     // Headers con el token
     const requestHeaders: HeadersInit = {
@@ -566,7 +570,7 @@ const handleNuevaSolicitud = async (solicitudBody: NuevaSolicitudBody) => {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: requestHeaders,
-      body: JSON.stringify(solicitudBody),
+      body: JSON.stringify(sanitizedSolicitudBody),
     })
 
     console.log('📥 [Nueva Solicitud] Respuesta recibida:')
