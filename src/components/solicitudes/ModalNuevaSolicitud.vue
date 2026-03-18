@@ -263,6 +263,13 @@ const solicitudBody = computed(() => {
     ...titulos,
   }
 
+  // El backend valida esquemas distintos por tipo.
+  // Aseguramos que propiedades exclusivas de "Certificado de Notas"
+  // (como `titulo7`) NO se envíen en otros tipos.
+  if (tipoConstancia.value !== 'Certificado de Notas' && 'titulo7' in finalBody) {
+    delete finalBody.titulo7
+  }
+
   // Agregar observacionAlumno si el usuario la proporcionó
   if (observaciones.value.trim()) {
     finalBody.observacionAlumno = observaciones.value.trim()
