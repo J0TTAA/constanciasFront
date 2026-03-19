@@ -75,6 +75,9 @@
         hide-default-footer
         class="asignaturas-table"
       >
+        <template v-slot:item.nota="{ item }">
+          <span>{{ item.nota === null ? 'Sin nota' : item.nota }}</span>
+        </template>
         <template v-slot:item.estado="{ item }">
           <v-chip :color="getEstadoColor(item.estado)" size="small" variant="tonal">
             {{ item.estado }}
@@ -219,6 +222,8 @@ type AsignaturaTableItem = {
   nombreAsignatura: string
   nivel: string
   nota: number | null
+  anhoCursada: number | null
+  semestreCursada: number | null
   estado: 'Aprobada' | 'Reprobada' | 'Cursando'
   puedeEliminar: boolean
 }
@@ -324,15 +329,28 @@ const fetchAsignaturas = async () => {
         ? payload.data
         : []
     
-    // Mapear datos del backend al formato esperado por la tabla de admin
-    // Endpoint esperado por alumno:
-    // { codAsignatura, nombreAsignatura, nivel }
+    // Contrato del backend:
+    // { codAsignatura, nombreAsignatura, nivel, nota, anhoCursada, semestreCursada }
     asignaturas.value = dataArray.map((asig: any) => {
-      const notaRaw = asig.notaFinal ?? asig.nota ?? asig.calificacion ?? null
+      const notaRaw = asig.nota ?? null
       const notaNumerica =
         notaRaw === null || notaRaw === undefined || notaRaw === ''
           ? null
           : Number(notaRaw)
+      const anhoCursadaRaw = asig.anhoCursada
+      const semestreCursadaRaw = asig.semestreCursada
+
+      const anhoCursadaNumerico =
+        anhoCursadaRaw === null || anhoCursadaRaw === undefined || anhoCursadaRaw === ''
+          ? null
+          : Number(anhoCursadaRaw)
+
+      const semestreCursadaNumerico =
+        semestreCursadaRaw === null ||
+        semestreCursadaRaw === undefined ||
+        semestreCursadaRaw === ''
+          ? null
+          : Number(semestreCursadaRaw)
 
       const tieneNota = notaNumerica !== null && !Number.isNaN(notaNumerica)
       const estado: AsignaturaTableItem['estado'] = !tieneNota
@@ -342,11 +360,18 @@ const fetchAsignaturas = async () => {
           : 'Reprobada'
 
       return {
-      codigo: asig.codAsignatura || asig.codigo || asig.asignatura?.codAsignatura || 'N/A',
-      nombreAsignatura:
-        asig.nombreAsignatura || asig.nombre || asig.asignatura?.nombreAsignatura || 'N/A',
-      nivel: asig.nivel || asig.asignatura?.nivel || 'N/A',
+      codigo: asig.codAsignatura || 'N/A',
+      nombreAsignatura: asig.nombreAsignatura || 'N/A',
+      nivel: asig.nivel || 'N/A',
       nota: tieneNota ? notaNumerica : null,
+      anhoCursada:
+        anhoCursadaNumerico !== null && !Number.isNaN(anhoCursadaNumerico)
+          ? anhoCursadaNumerico
+          : null,
+      semestreCursada:
+        semestreCursadaNumerico !== null && !Number.isNaN(semestreCursadaNumerico)
+          ? semestreCursadaNumerico
+          : null,
       estado,
       // Regla de negocio: solo se elimina si no tiene nota (esta cursando)
       puedeEliminar: !tieneNota,
@@ -543,14 +568,16 @@ onMounted(() => {
 })
 
 watch(() => props.userRut, () => {
-  if (props.userRut) {
-    fetchAsignaturas()
-  }
+  fetchAsignaturas()
+})
+
+watch(() => props.userUuid, () => {
+  fetchAsignaturas()
 })
 
 const headers: VDataTable['$props']['headers'] = [
-  { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'NOMBRE ASIGNATURA', key: 'nombreAsignatura', sortable: true },
+  { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'NIVEL', key: 'nivel', sortable: true },
   { title: 'ESTADO', key: 'estado', sortable: true },
   { title: 'ACCIONES', key: 'acciones', sortable: false, align: 'end' },
@@ -567,6 +594,11 @@ const filteredAsignaturas = computed(() => {
   if (query) {
     items = items.filter((a) =>
       [a.codigo, a.nombreAsignatura, a.nivel, a.estado]
+        .concat(
+          a.nota !== null ? String(a.nota) : '',
+          a.anhoCursada !== null ? String(a.anhoCursada) : '',
+          a.semestreCursada !== null ? String(a.semestreCursada) : '',
+        )
         .join(' ')
         .toLowerCase()
         .includes(query),
