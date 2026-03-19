@@ -75,24 +75,10 @@
         hide-default-footer
         class="asignaturas-table"
       >
-        <template v-slot:item.estado="{ item }">
-          <v-chip
-            :color="getEstadoColor(item.estado)"
-            size="small"
-            variant="flat"
-          >
-            {{ item.estado }}
-          </v-chip>
-        </template>
-
-        <template v-slot:item.acciones="{ item }">
-          <v-btn
-            icon="mdi-delete"
-            variant="text"
-            size="small"
-            color="error"
-            @click="handleDelete(item)"
-          ></v-btn>
+        <template v-slot:item.notaFinal="{ item }">
+          <span :style="{ color: item.notaFinal !== 'N/A' && item.notaFinal >= 4.0 ? '#4caf50' : '#f44336', fontWeight: '600' }">
+            {{ item.notaFinal }}
+          </span>
         </template>
       </v-data-table>
 
@@ -305,18 +291,15 @@ const fetchAsignaturas = async () => {
         ? payload.data
         : []
     
-    // Mapear datos del backend al formato esperado
-    // El backend devuelve un array de asignaturas con codAsignatura y nombreAsignatura
+    // Mapear datos del backend al formato esperado por la tabla de admin
     asignaturas.value = dataArray.map((asig: any) => ({
-      codigo: asig.codAsignatura || asig.codigo,
-      nombre: asig.nombreAsignatura || asig.nombre,
-      creditos: asig.creditos || 0,
-      semestre: asig.semestre || 'N/A',
-      profesor: asig.profesor || asig.nombreProfesor || 'N/A',
-      estado: asig.estado || 'Cursando',
-      // Mantener datos originales para referencia
-      codAsignatura: asig.codAsignatura || asig.codigo,
-      nombreAsignatura: asig.nombreAsignatura || asig.nombre,
+      codigo: asig.codAsignatura || asig.codigo || asig.asignatura?.codAsignatura || 'N/A',
+      nombreAsignatura:
+        asig.nombreAsignatura || asig.nombre || asig.asignatura?.nombreAsignatura || 'N/A',
+      nivel: asig.nivel || asig.asignatura?.nivel || 'N/A',
+      anho: asig.anhoCursada || asig.anho || 'N/A',
+      semestre: asig.semestreCursada || asig.semestre || 'N/A',
+      notaFinal: asig.nota ?? 'N/A',
     }))
   } catch (err) {
     console.error('Error al cargar asignaturas:', err)
@@ -516,18 +499,21 @@ watch(() => props.userRut, () => {
 
 const headers: VDataTable['$props']['headers'] = [
   { title: 'CÓDIGO', key: 'codigo', sortable: true },
-  { title: 'ASIGNATURA', key: 'nombre', sortable: true },
-  { title: 'CRÉDITOS', key: 'creditos', sortable: true },
+  { title: 'NOMBRE ASIGNATURA', key: 'nombreAsignatura', sortable: true },
+  { title: 'NIVEL', key: 'nivel', sortable: true },
+  { title: 'AÑO', key: 'anho', sortable: true },
   { title: 'SEMESTRE', key: 'semestre', sortable: true },
-  { title: 'PROFESOR', key: 'profesor', sortable: true },
-  { title: 'ESTADO', key: 'estado', sortable: true },
-  { title: 'ACCIONES', key: 'acciones', sortable: false, align: 'end' },
+  { title: 'NOTA FINAL', key: 'notaFinal', sortable: true },
 ]
 
 const totalAsignaturas = computed(() => asignaturas.value.length)
-const aprobadas = computed(() => asignaturas.value.filter(a => a.estado === 'Aprobada').length)
-const cursando = computed(() => asignaturas.value.filter(a => a.estado === 'Cursando').length)
-const totalCreditos = computed(() => asignaturas.value.reduce((sum, a) => sum + a.creditos, 0))
+const aprobadas = computed(() =>
+  asignaturas.value.filter((a) => typeof a.notaFinal === 'number' && a.notaFinal >= 4.0).length,
+)
+const cursando = computed(() =>
+  asignaturas.value.filter((a) => a.notaFinal === 'N/A').length,
+)
+const totalCreditos = computed(() => 0)
 
 const getEstadoColor = (estado: string): string => {
   const colors: Record<string, string> = {
