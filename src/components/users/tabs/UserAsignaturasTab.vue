@@ -70,17 +70,23 @@
       </v-alert>
       <v-data-table
         :headers="headers"
-        :items="asignaturas"
+        :items="filteredAsignaturas"
         :loading="isLoading"
         hide-default-footer
         class="asignaturas-table"
       >
+        <template v-slot:item.estado="{ item }">
+          <v-chip :color="getEstadoColor(item.estado)" size="small" variant="tonal">
+            {{ item.estado }}
+          </v-chip>
+        </template>
         <template v-slot:item.acciones="{ item }">
           <v-btn
             icon="mdi-delete"
             variant="text"
             size="small"
-            color="error"
+            :color="item.puedeEliminar ? 'error' : 'grey'"
+            :disabled="!item.puedeEliminar"
             @click="handleDelete(item)"
           ></v-btn>
         </template>
@@ -179,6 +185,15 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Modal de confirmación para eliminar asignatura -->
+    <ConfirmDeleteDialog
+      v-model="showDeleteDialog"
+      :message="deleteMessage"
+      :loading="isDeleting"
+      @confirm="confirmDeleteAsignatura"
+      @cancel="cancelDeleteAsignatura"
+    />
   </div>
 </template>
 
@@ -187,6 +202,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
+import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog.vue'
 
 const props = defineProps<{
   userId: string
@@ -198,7 +214,16 @@ const auth = useAuthStore()
 const searchQuery = ref('')
 const selectedFilter = ref('Todos')
 const filterOptions = ['Todos', 'Aprobadas', 'Cursando', 'Pendientes', 'Reprobadas']
-const asignaturas = ref<any[]>([])
+type AsignaturaTableItem = {
+  codigo: string
+  nombreAsignatura: string
+  nivel: string
+  nota: number | null
+  estado: 'Aprobada' | 'Reprobada' | 'Cursando'
+  puedeEliminar: boolean
+}
+
+const asignaturas = ref<AsignaturaTableItem[]>([])
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const showAssignDialog = ref(false)
@@ -207,6 +232,10 @@ const selectedAsignatura = ref<any>(null)
 const anhoCursada = ref(new Date().getFullYear())
 const semestreCursada = ref(1)
 const nota = ref<number | null>(null)
+const showDeleteDialog = ref(false)
+const asignaturaToDelete = ref<any>(null)
+const deleteMessage = ref('')
+const isDeleting = ref(false)
 
 // Cargar asignaturas del alumno
 const fetchAsignaturas = async () => {
@@ -298,12 +327,31 @@ const fetchAsignaturas = async () => {
     // Mapear datos del backend al formato esperado por la tabla de admin
     // Endpoint esperado por alumno:
     // { codAsignatura, nombreAsignatura, nivel }
-    asignaturas.value = dataArray.map((asig: any) => ({
+    asignaturas.value = dataArray.map((asig: any) => {
+      const notaRaw = asig.notaFinal ?? asig.nota ?? asig.calificacion ?? null
+      const notaNumerica =
+        notaRaw === null || notaRaw === undefined || notaRaw === ''
+          ? null
+          : Number(notaRaw)
+
+      const tieneNota = notaNumerica !== null && !Number.isNaN(notaNumerica)
+      const estado: AsignaturaTableItem['estado'] = !tieneNota
+        ? 'Cursando'
+        : notaNumerica >= 4
+          ? 'Aprobada'
+          : 'Reprobada'
+
+      return {
       codigo: asig.codAsignatura || asig.codigo || asig.asignatura?.codAsignatura || 'N/A',
       nombreAsignatura:
         asig.nombreAsignatura || asig.nombre || asig.asignatura?.nombreAsignatura || 'N/A',
       nivel: asig.nivel || asig.asignatura?.nivel || 'N/A',
-    }))
+      nota: tieneNota ? notaNumerica : null,
+      estado,
+      // Regla de negocio: solo se elimina si no tiene nota (esta cursando)
+      puedeEliminar: !tieneNota,
+      }
+    })
   } catch (err) {
     console.error('Error al cargar asignaturas:', err)
     error.value = 'Error al cargar asignaturas'
@@ -504,17 +552,36 @@ const headers: VDataTable['$props']['headers'] = [
   { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'NOMBRE ASIGNATURA', key: 'nombreAsignatura', sortable: true },
   { title: 'NIVEL', key: 'nivel', sortable: true },
+  { title: 'ESTADO', key: 'estado', sortable: true },
   { title: 'ACCIONES', key: 'acciones', sortable: false, align: 'end' },
 ]
 
 const totalAsignaturas = computed(() => asignaturas.value.length)
-const aprobadas = computed(() => {
-  const niveles = new Set(asignaturas.value.map((a) => a.nivel).filter(Boolean))
-  return niveles.size
-})
-const cursando = computed(() => {
-  const codigos = new Set(asignaturas.value.map((a) => a.codigo).filter(Boolean))
-  return codigos.size
+const aprobadas = computed(() => asignaturas.value.filter((a) => a.estado === 'Aprobada').length)
+const cursando = computed(() => asignaturas.value.filter((a) => a.estado === 'Cursando').length)
+
+const filteredAsignaturas = computed(() => {
+  let items = [...asignaturas.value]
+
+  const query = searchQuery.value.trim().toLowerCase()
+  if (query) {
+    items = items.filter((a) =>
+      [a.codigo, a.nombreAsignatura, a.nivel, a.estado]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    )
+  }
+
+  if (selectedFilter.value === 'Aprobadas') {
+    items = items.filter((a) => a.estado === 'Aprobada')
+  } else if (selectedFilter.value === 'Reprobadas') {
+    items = items.filter((a) => a.estado === 'Reprobada')
+  } else if (selectedFilter.value === 'Cursando' || selectedFilter.value === 'Pendientes') {
+    items = items.filter((a) => a.estado === 'Cursando')
+  }
+
+  return items
 })
 
 const getEstadoColor = (estado: string): string => {
@@ -528,8 +595,83 @@ const getEstadoColor = (estado: string): string => {
 }
 
 const handleDelete = (item: any) => {
-  // TODO: Implementar eliminación
-  console.log('Eliminar:', item)
+  if (!item?.codigo || !item?.puedeEliminar) return
+  asignaturaToDelete.value = item
+  deleteMessage.value = `¿Estás seguro de quitar la asignatura ${item.codigo} - ${item.nombreAsignatura}?`
+  showDeleteDialog.value = true
+}
+
+const confirmDeleteAsignatura = async () => {
+  if (!asignaturaToDelete.value || !auth.token) return
+
+  const userUuid = props.userUuid || props.userId
+  if (!userUuid) {
+    error.value = 'No se pudo obtener el UUID del usuario.'
+    return
+  }
+
+  const codAsignatura = asignaturaToDelete.value.codigo
+  isDeleting.value = true
+
+  try {
+    const apiUrl = getApiBaseUrl()
+    const isDevelopment = import.meta.env.DEV || false
+    const cleanToken = auth.token.trim()
+
+    // Endpoint principal esperado (REST por recurso)
+    const endpointByCode = isDevelopment
+      ? `/api/v1/alumnos/usuario/${userUuid}/asignaturas/${encodeURIComponent(codAsignatura)}`
+      : `${apiUrl}/api/v1/alumnos/usuario/${userUuid}/asignaturas/${encodeURIComponent(codAsignatura)}`
+
+    let response = await fetch(endpointByCode, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanToken}`,
+      },
+    })
+
+    // Fallback para implementaciones que usan /desasignar con body
+    if (!response.ok) {
+      const endpointFallback = isDevelopment
+        ? `/api/v1/alumnos/usuario/${userUuid}/asignaturas/desasignar`
+        : `${apiUrl}/api/v1/alumnos/usuario/${userUuid}/asignaturas/desasignar`
+
+      response = await fetch(endpointFallback, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cleanToken}`,
+        },
+        body: JSON.stringify({ codAsignatura }),
+      })
+    }
+
+    if (!response.ok) {
+      let errorText = ''
+      try {
+        errorText = await response.text()
+      } catch {
+        errorText = 'Error al eliminar asignatura'
+      }
+      throw new Error(`Error ${response.status}: ${errorText}`)
+    }
+
+    await fetchAsignaturas()
+    showDeleteDialog.value = false
+    asignaturaToDelete.value = null
+    error.value = null
+  } catch (err) {
+    console.error('❌ [UserAsignaturasTab] Error al eliminar asignatura:', err)
+    error.value = err instanceof Error ? err.message : 'Error al eliminar asignatura'
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+const cancelDeleteAsignatura = () => {
+  asignaturaToDelete.value = null
+  deleteMessage.value = ''
 }
 </script>
 
