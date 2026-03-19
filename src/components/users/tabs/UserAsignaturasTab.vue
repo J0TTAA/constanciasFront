@@ -74,17 +74,11 @@
         :loading="isLoading"
         hide-default-footer
         class="asignaturas-table"
-      >
-        <template v-slot:item.notaFinal="{ item }">
-          <span :style="{ color: item.notaFinal !== 'N/A' && item.notaFinal >= 4.0 ? '#4caf50' : '#f44336', fontWeight: '600' }">
-            {{ item.notaFinal }}
-          </span>
-        </template>
-      </v-data-table>
+      />
 
       <div class="table-footer">
         <span class="text-caption text-medium-emphasis">
-          {{ asignaturas.length }} asignaturas - {{ totalCreditos }} créditos totales
+          {{ asignaturas.length }} asignaturas registradas
         </span>
       </div>
     </v-card>
@@ -292,14 +286,13 @@ const fetchAsignaturas = async () => {
         : []
     
     // Mapear datos del backend al formato esperado por la tabla de admin
+    // Endpoint esperado por alumno:
+    // { codAsignatura, nombreAsignatura, nivel }
     asignaturas.value = dataArray.map((asig: any) => ({
       codigo: asig.codAsignatura || asig.codigo || asig.asignatura?.codAsignatura || 'N/A',
       nombreAsignatura:
         asig.nombreAsignatura || asig.nombre || asig.asignatura?.nombreAsignatura || 'N/A',
       nivel: asig.nivel || asig.asignatura?.nivel || 'N/A',
-      anho: asig.anhoCursada || asig.anho || 'N/A',
-      semestre: asig.semestreCursada || asig.semestre || 'N/A',
-      notaFinal: asig.nota ?? 'N/A',
     }))
   } catch (err) {
     console.error('Error al cargar asignaturas:', err)
@@ -501,19 +494,17 @@ const headers: VDataTable['$props']['headers'] = [
   { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'NOMBRE ASIGNATURA', key: 'nombreAsignatura', sortable: true },
   { title: 'NIVEL', key: 'nivel', sortable: true },
-  { title: 'AÑO', key: 'anho', sortable: true },
-  { title: 'SEMESTRE', key: 'semestre', sortable: true },
-  { title: 'NOTA FINAL', key: 'notaFinal', sortable: true },
 ]
 
 const totalAsignaturas = computed(() => asignaturas.value.length)
-const aprobadas = computed(() =>
-  asignaturas.value.filter((a) => typeof a.notaFinal === 'number' && a.notaFinal >= 4.0).length,
-)
-const cursando = computed(() =>
-  asignaturas.value.filter((a) => a.notaFinal === 'N/A').length,
-)
-const totalCreditos = computed(() => 0)
+const aprobadas = computed(() => {
+  const niveles = new Set(asignaturas.value.map((a) => a.nivel).filter(Boolean))
+  return niveles.size
+})
+const cursando = computed(() => {
+  const codigos = new Set(asignaturas.value.map((a) => a.codigo).filter(Boolean))
+  return codigos.size
+})
 
 const getEstadoColor = (estado: string): string => {
   const colors: Record<string, string> = {
