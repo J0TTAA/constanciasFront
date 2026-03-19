@@ -74,7 +74,17 @@
         :loading="isLoading"
         hide-default-footer
         class="asignaturas-table"
-      />
+      >
+        <template v-slot:item.acciones="{ item }">
+          <v-btn
+            icon="mdi-delete"
+            variant="text"
+            size="small"
+            color="error"
+            @click="handleDelete(item)"
+          ></v-btn>
+        </template>
+      </v-data-table>
 
       <div class="table-footer">
         <span class="text-caption text-medium-emphasis">
@@ -494,6 +504,7 @@ const headers: VDataTable['$props']['headers'] = [
   { title: 'CÓDIGO', key: 'codigo', sortable: true },
   { title: 'NOMBRE ASIGNATURA', key: 'nombreAsignatura', sortable: true },
   { title: 'NIVEL', key: 'nivel', sortable: true },
+  { title: 'ACCIONES', key: 'acciones', sortable: false, align: 'end' },
 ]
 
 const totalAsignaturas = computed(() => asignaturas.value.length)
