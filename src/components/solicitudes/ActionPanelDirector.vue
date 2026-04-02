@@ -27,7 +27,7 @@
         item-value="value"
         density="comfortable"
         variant="outlined"
-        :disabled="isUpdating"
+        :disabled="isUpdating || isStatusLocked"
       >
         <template #item="{ props, item }">
           <v-list-item
@@ -74,7 +74,7 @@
       class="panel-action"
       color="primary"
       :loading="isUpdating"
-      :disabled="isUpdating || newStatus === currentStatus"
+      :disabled="isUpdating || isStatusLocked || newStatus === currentStatus"
       @click="handleUpdateStatus"
       prepend-icon="mdi-check-decagram"
     >
@@ -151,11 +151,12 @@ const currentStatus = computed(() => {
   return mapStatusToBackend(status)
 })
 
+const isStatusLocked = computed(() => currentStatus.value === 'FIRMADA')
+
 // Opciones de estado para el director
 const statusOptions = [
   { label: 'Solicitada', value: 'SOLICITADA' },
   { label: 'En Revisión', value: 'EN_REVISION' },
-  { label: 'Firmada', value: 'FIRMADA' },
   { label: 'Rechazada', value: 'RECHAZADA', icon: 'mdi-close-circle' },
 ]
 

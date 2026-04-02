@@ -52,7 +52,7 @@
         @click="handleDownloadOriginal"
         block
       >
-        Descargar Original (DOCX)
+        Descargar PDF
       </v-btn>
     </div>
 
@@ -68,9 +68,7 @@
             variant="outlined"
             prepend-icon="mdi-file-word"
             size="small"
-            @click="handleDownloadOriginal"
-            :loading="isDownloadingDocument"
-            :disabled="isDownloadingDocument"
+            @click="downloadDocument"
           >
             Descargar DOCX
           </v-btn>
@@ -79,7 +77,9 @@
             variant="outlined"
             prepend-icon="mdi-download"
             size="small"
-            @click="downloadDocument"
+            :loading="isDownloadingDocument"
+            :disabled="isDownloadingDocument"
+            @click="handleDownloadOriginal"
           >
             Descargar PDF
           </v-btn>
@@ -497,6 +497,7 @@ const documentTypeInfo = computed(() => {
   }
 })
 
+// Descarga el blob ya cargado en la previsualización (DOCX renderizado o PDF en iframe)
 const downloadDocument = () => {
   if (!documentBlob.value) return
 
@@ -545,7 +546,7 @@ const downloadDocument = () => {
   console.log('📥 [Documento] Descarga iniciada')
 }
 
-// Función para descargar el documento original (DOCX)
+// Descarga vía GET /descargar (el backend entrega PDF)
 const handleDownloadOriginal = async () => {
   // Verificar que el store esté inicializado
   if (!auth.initialized) {
@@ -577,7 +578,7 @@ const handleDownloadOriginal = async () => {
       ? `/api/v1/constancias/documento/${documentIdToUse.value}/descargar`
       : `${apiUrl}/api/v1/constancias/documento/${documentIdToUse.value}/descargar`
     
-    console.log('📥 [Descarga] Descargando documento original (DOCX)...')
+    console.log('📥 [Descarga] Descargando documento (PDF)...')
     console.log(
       '   - Endpoint relativo:',
       `/api/v1/constancias/documento/${documentIdToUse.value}/descargar`,

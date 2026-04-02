@@ -15,7 +15,7 @@
         item-value="value"
         density="comfortable"
         variant="outlined"
-        :disabled="isUpdating"
+        :disabled="isUpdating || isStatusLocked"
       >
         <template #item="{ props, item }">
           <v-list-item
@@ -70,7 +70,7 @@
       class="panel-action"
       color="primary"
       :loading="isUpdating"
-      :disabled="isUpdating || newStatus === currentStatus"
+      :disabled="isUpdating || isStatusLocked || newStatus === currentStatus"
       @click="handleUpdateStatus"
       prepend-icon="mdi-send"
     >
@@ -143,6 +143,8 @@ const currentStatus = computed(() => {
   return mapStatusToBackend(status)
 })
 
+const isStatusLocked = computed(() => currentStatus.value === 'FIRMADA')
+
 // Inicializar el estado seleccionado cuando el componente se monta o cambia el request
 onMounted(() => {
   newStatus.value = currentStatus.value
@@ -164,7 +166,6 @@ const documentIdToUse = computed(() => props.request.documentId || props.request
 const statusOptions = [
   { label: 'Solicitada', value: 'SOLICITADA' },
   { label: 'En Revisión', value: 'EN_REVISION' },
-  { label: 'Firmada', value: 'FIRMADA' },
   { label: 'Rechazada', value: 'RECHAZADA', icon: 'mdi-close-circle' },
 ]
 
