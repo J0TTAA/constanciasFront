@@ -2,6 +2,14 @@
   <div class="admin-page">
     <!-- Vista de lista de usuarios -->
     <template v-if="!showCreateForm && !showUserDetail">
+      <v-tabs v-model="activeTab" color="#1e5a3d" class="mb-6">
+        <v-tab value="usuarios">Usuarios</v-tab>
+        <v-tab value="importar">Importar Excel</v-tab>
+        <v-tab value="asignacion">Asignación masiva</v-tab>
+      </v-tabs>
+
+      <v-window v-model="activeTab">
+        <v-window-item value="usuarios">
       <!-- Encabezado -->
       <div class="admin-header">
         <div class="header-left">
@@ -152,6 +160,16 @@
         </div>
       </div>
     </v-card>
+        </v-window-item>
+
+        <v-window-item value="importar">
+          <AdminExcelImport />
+        </v-window-item>
+
+        <v-window-item value="asignacion">
+          <AdminAsignacionMasiva :students="studentsForMassAssign" :is-loading-students="isLoadingUsers" />
+        </v-window-item>
+      </v-window>
     </template>
 
     <!-- Vista de detalle del usuario -->
@@ -463,8 +481,12 @@ import type { VDataTable } from 'vuetify/components'
 import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import UserDetailView from '@/components/users/UserDetailView.vue'
+import AdminExcelImport from '@/components/admin/AdminExcelImport.vue'
+import AdminAsignacionMasiva from '@/components/admin/AdminAsignacionMasiva.vue'
 
 const auth = useAuthStore()
+
+const activeTab = ref<'usuarios' | 'importar' | 'asignacion'>('usuarios')
 
 // Estado para controlar la vista
 const showCreateForm = ref(false)
@@ -659,6 +681,16 @@ const displayedUsers = computed(() => {
   return Math.min(end, totalUsers.value)
 })
 const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value))
+
+const studentsForMassAssign = computed(() =>
+  users.value.map((u: any) => ({
+    uuid: u.uuid || u.id,
+    auth0UserId: u.auth0UserId,
+    rut: u.rut,
+    nombre: u.nombre,
+    email: u.email,
+  })),
+)
 
 // Cargar usuarios desde el backend
 const fetchUsers = async () => {
