@@ -683,13 +683,15 @@ const displayedUsers = computed(() => {
 const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value))
 
 const studentsForMassAssign = computed(() =>
-  users.value.map((u: any) => ({
-    uuid: u.uuid || u.id,
-    auth0UserId: u.auth0UserId,
-    rut: u.rut,
-    nombre: u.nombre,
-    email: u.email,
-  })),
+  users.value
+    .map((u: any) => ({
+      uuid: u.uuid || u.id,
+      auth0UserId: u.auth0UserId,
+      rut: u.rut,
+      nombre: u.nombre,
+      email: u.email,
+    }))
+    .filter((u: any) => !!u.auth0UserId),
 )
 
 // Cargar usuarios desde el backend
@@ -806,7 +808,7 @@ const fetchUsers = async () => {
         segundoNombre: user.segundoNombre,
         apellidoPaterno: user.apellidoPaterno,
         apellidoMaterno: user.apellidoMaterno,
-        auth0UserId: user.auth0UserId,
+        auth0UserId: user.auth0UserId || user.authUserId || null,
       }
     })
   } catch (error) {

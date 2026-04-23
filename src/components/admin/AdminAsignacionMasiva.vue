@@ -49,7 +49,7 @@
           prepend-icon="mdi-check-decagram"
           :loading="isPrevalidating"
           :disabled="isPrevalidating || selectedStudents.length === 0 || isLoadingAsignaturas"
-          @click="runPrevalidation"
+          @click="handlePrevalidateClick"
         >
           Prevalidar selección
         </v-btn>
@@ -312,7 +312,8 @@ const runPrevalidation = async (onlyCodes?: string[]) => {
     .map((s) => s.auth0UserId)
     .filter(Boolean) as string[]
   if (auth0UserIds.length !== selectedStudents.value.length) {
-    throw new Error('Faltan auth0UserId en uno o más estudiantes.')
+    error.value = 'Hay estudiantes sin auth0UserId. Refresca la lista o excluye esos usuarios.'
+    return null
   }
 
   const codes = (onlyCodes && onlyCodes.length > 0
@@ -381,6 +382,14 @@ const runPrevalidation = async (onlyCodes?: string[]) => {
     return payload
   } finally {
     isPrevalidating.value = false
+  }
+}
+
+const handlePrevalidateClick = async () => {
+  try {
+    await runPrevalidation()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error al prevalidar selección'
   }
 }
 
