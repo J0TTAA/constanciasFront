@@ -285,20 +285,38 @@ const buildAsignaturasPayload = (codes: string[]) =>
   })
 
 type ValidationEntry = { codAsignatura: string; puedeAsignar: boolean }
-const collectValidationEntries = (node: unknown, acc: ValidationEntry[]) => {
+type ValidationPairEntry = { auth0UserId: string; codAsignatura: string; puedeAsignar: boolean }
+const collectValidationEntries = (
+  node: unknown,
+  acc: ValidationEntry[],
+  pairAcc: ValidationPairEntry[],
+  auth0Ctx: string | null = null,
+) => {
   if (Array.isArray(node)) {
-    for (const item of node) collectValidationEntries(item, acc)
+    for (const item of node) collectValidationEntries(item, acc, pairAcc, auth0Ctx)
     return
   }
   if (!node || typeof node !== 'object') return
 
   const obj = node as Record<string, unknown>
+  const localAuth0 =
+    typeof obj.auth0UserId === 'string' && obj.auth0UserId.trim().length > 0
+      ? obj.auth0UserId.trim()
+      : typeof obj.authUserId === 'string' && obj.authUserId.trim().length > 0
+        ? obj.authUserId.trim()
+        : auth0Ctx
+
   const cod = typeof obj.codAsignatura === 'string' ? obj.codAsignatura : null
   const puede = typeof obj.puedeAsignar === 'boolean' ? obj.puedeAsignar : null
-  if (cod && puede !== null) acc.push({ codAsignatura: cod, puedeAsignar: puede })
+  if (cod && puede !== null) {
+    acc.push({ codAsignatura: cod, puedeAsignar: puede })
+    if (localAuth0) {
+      pairAcc.push({ auth0UserId: localAuth0, codAsignatura: cod, puedeAsignar: puede })
+    }
+  }
 
   for (const key of Object.keys(obj)) {
-    collectValidationEntries(obj[key], acc)
+    collectValidationEntries(obj[key], acc, pairAcc, localAuth0)
   }
 }
 
@@ -363,7 +381,8 @@ const runPrevalidation = async (onlyCodes?: string[]) => {
 
     const payload = await res.json().catch(() => ({}))
     const entries: ValidationEntry[] = []
-    collectValidationEntries(payload?.resultados ?? payload, entries)
+    const pairEntries: ValidationPairEntry[] = []
+    collectValidationEntries(payload?.resultados ?? payload, entries, pairEntries)
 
     const byCode: Record<string, { assignable: number; blocked: number; total: number }> = {}
     for (const cod of codes) {
@@ -377,6 +396,15 @@ const runPrevalidation = async (onlyCodes?: string[]) => {
     }
 
     prevalidationByCode.value = byCode
+    assignableUsersByCode.value = {}
+    for (const cod of codes) {
+      assignableUsersByCode.value[cod] = new Set<string>()
+    }
+    for (const entry of pairEntries) {
+      if (entry.puedeAsignar && assignableUsersByCode.value[entry.codAsignatura]) {
+        assignableUsersByCode.value[entry.codAsignatura].add(entry.auth0UserId)
+      }
+    }
     const resumen = payload?.resumen
     if (resumen) {
       prevalidationInfo.value =
@@ -415,8 +443,8 @@ const isAsignaturaDisabled = (codAsignatura: string) => {
   if (selectedStudents.value.length === 0) return true
   const stat = prevalidationByCode.value[codAsignatura]
   if (!stat) return true
-  // Regla estricta: si alguna combinación no es asignable, no se permite selección masiva.
-  return stat.blocked > 0
+  // Solo deshabilitar si ninguna combinación es asignable
+  return stat.assignable === 0
 }
 
 watch(
@@ -460,6 +488,7 @@ watch(
 )
 
 const isSubmitting = ref(false)
+const assignableUsersByCode = ref<Record<string, Set<string>>>({})
 const submit = async () => {
   error.value = null
   success.value = null
@@ -484,43 +513,53 @@ const submit = async () => {
 
     const selectedCodes = selectedAsignaturas.value.map((a) => a.codAsignatura).filter(Boolean)
     await runPrevalidation(selectedCodes)
-    const preErrors = selectedCodes.filter((cod) => {
-      const stat = prevalidationByCode.value[cod]
-      return !stat || stat.blocked > 0
-    })
-    if (preErrors.length > 0) {
-      throw new Error(
-        `Hay asignaturas no asignables según prevalidación: ${preErrors.join(', ')}. Ajusta la selección.`,
-      )
-    }
-
-    const asignaturasPayload = buildAsignaturasPayload(selectedCodes)
-
     const endpoint = isDev.value
       ? '/api/v1/alumnos/usuarios/asignaturas/asignar-masivo'
       : `${apiUrl}/api/v1/alumnos/usuarios/asignaturas/asignar-masivo`
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ auth0UserIds, asignaturas: asignaturasPayload }),
-    })
+    let totalCreadas = 0
+    let totalActualizadas = 0
+    let totalOmitidas = 0
+    let totalErrores = 0
+    let ejecutadas = 0
 
-    if (!res.ok) {
-      const t = await res.text().catch(() => '')
-      throw new Error(t || `Error ${res.status}`)
+    for (const cod of selectedCodes) {
+      const idsSet = assignableUsersByCode.value[cod]
+      const ids = idsSet ? Array.from(idsSet) : []
+      if (ids.length === 0) continue
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          auth0UserIds: ids,
+          asignaturas: buildAsignaturasPayload([cod]),
+        }),
+      })
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(t || `Error ${res.status} en asignatura ${cod}`)
+      }
+
+      const payload = await res.json().catch(() => ({}))
+      totalCreadas += Number(payload?.creadas || 0)
+      totalActualizadas += Number(payload?.actualizadas || 0)
+      totalOmitidas += Number(payload?.omitidas || 0)
+      totalErrores += Array.isArray(payload?.errores) ? payload.errores.length : 0
+      ejecutadas += 1
     }
 
-    const payload = await res.json().catch(() => ({}))
-    const creadas = payload?.creadas ?? '-'
-    const actualizadas = payload?.actualizadas ?? '-'
-    const omitidas = payload?.omitidas ?? '-'
-    const errores = Array.isArray(payload?.errores) ? payload.errores.length : 0
+    if (ejecutadas === 0) {
+      throw new Error('No hay combinaciones asignables con la selección actual.')
+    }
 
-    success.value = `Asignación masiva finalizada. Creadas: ${creadas}, Actualizadas: ${actualizadas}, Omitidas: ${omitidas}, Errores: ${errores}.`
+    success.value =
+      `Asignación masiva finalizada. Creadas: ${totalCreadas}, ` +
+      `Actualizadas: ${totalActualizadas}, Omitidas: ${totalOmitidas}, Errores: ${totalErrores}.`
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Error al asignar masivamente'
   } finally {

@@ -167,7 +167,10 @@
         </v-window-item>
 
         <v-window-item value="asignacion">
-          <AdminAsignacionMasiva :students="studentsForMassAssign" :is-loading-students="isLoadingUsers" />
+          <AdminAsignacionMasiva
+            :students="studentsForMassAssign"
+            :is-loading-students="isLoadingMassAssignStudents"
+          />
         </v-window-item>
       </v-window>
     </template>
@@ -656,6 +659,8 @@ const handleSubmit = async () => {
 const users = ref<any[]>([])
 const isLoadingUsers = ref(false)
 const usersError = ref<string | null>(null)
+const massAssignStudents = ref<any[]>([])
+const isLoadingMassAssignStudents = ref(false)
 
 const searchQuery = ref('')
 const selectedRole = ref('Todos los roles')
@@ -683,16 +688,74 @@ const displayedUsers = computed(() => {
 const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value))
 
 const studentsForMassAssign = computed(() =>
-  users.value
-    .map((u: any) => ({
-      uuid: u.uuid || u.id,
-      auth0UserId: u.auth0UserId,
-      rut: u.rut,
-      nombre: u.nombre,
-      email: u.email,
-    }))
-    .filter((u: any) => typeof u.auth0UserId === 'string' && u.auth0UserId.trim().length > 0),
+  massAssignStudents.value,
 )
+
+const fetchMassAssignStudents = async () => {
+  if (!auth.initialized) {
+    await auth.loadFromStorage()
+  }
+
+  const tokenFromStore = auth.token
+  if (!tokenFromStore) return
+
+  isLoadingMassAssignStudents.value = true
+  try {
+    const apiUrl = getApiBaseUrl()
+    const isDevelopment = import.meta.env.DEV || false
+    const endpoint = isDevelopment
+      ? '/api/v1/usuarios/admin/usuarios/validos-auth0'
+      : `${apiUrl}/api/v1/usuarios/admin/usuarios/validos-auth0`
+
+    const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cleanToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status} al cargar usuarios válidos para asignación masiva.`)
+    }
+
+    const payload = await response.json()
+    const dataArray: any[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : []
+
+    massAssignStudents.value = dataArray
+      .map((user: any) => {
+        const auth0UserId = (user.auth0UserId || user.authUserId || '').toString().trim()
+        return {
+          uuid: user.id || user.uuid || auth0UserId || user.email,
+          auth0UserId,
+          rut: user.rut,
+          nombre:
+            user.nombreCompleto ||
+            `${user.primerNombre || ''} ${user.segundoNombre || ''} ${user.apellidoPaterno || ''} ${user.apellidoMaterno || ''}`.trim(),
+          email: user.email,
+        }
+      })
+      .filter((u: any) => u.auth0UserId.length > 0)
+  } catch {
+    // Fallback silencioso: usar lista local de usuarios ya cargada
+    massAssignStudents.value = users.value
+      .map((u: any) => ({
+        uuid: u.uuid || u.id,
+        auth0UserId: (u.auth0UserId || '').toString().trim(),
+        rut: u.rut,
+        nombre: u.nombre,
+        email: u.email,
+      }))
+      .filter((u: any) => u.auth0UserId.length > 0)
+  } finally {
+    isLoadingMassAssignStudents.value = false
+  }
+}
 
 // Cargar usuarios desde el backend
 const fetchUsers = async () => {
@@ -822,6 +885,7 @@ const fetchUsers = async () => {
 // Cargar usuarios al montar el componente
 onMounted(() => {
   fetchUsers()
+  fetchMassAssignStudents()
 })
 
 // Funciones auxiliares
