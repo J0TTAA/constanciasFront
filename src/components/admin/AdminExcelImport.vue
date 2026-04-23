@@ -204,8 +204,8 @@ const downloadTemplate = async () => {
   try {
     const apiUrl = getApiBaseUrl()
     const endpoint = isDev.value
-      ? '/api/v1/usuarios/admin/usuarios/template-excel'
-      : `${apiUrl}/api/v1/usuarios/admin/usuarios/template-excel`
+      ? '/api/v1/usuarios/admin/usuarios/template-excel-prueba'
+      : `${apiUrl}/api/v1/usuarios/admin/usuarios/template-excel-prueba`
 
     const response = await fetch(endpoint, {
       method: 'GET',

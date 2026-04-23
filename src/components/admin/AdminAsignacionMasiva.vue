@@ -18,11 +18,52 @@
       </v-btn>
     </div>
 
+    <v-row dense class="mb-2">
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model.number="anhoCursada"
+          label="Año cursada (opcional)"
+          type="number"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+        />
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-select
+          v-model="semestreCursada"
+          :items="[
+            { title: 'Sin semestre', value: null },
+            { title: 'Semestre 1', value: 1 },
+            { title: 'Semestre 2', value: 2 }
+          ]"
+          label="Semestre (opcional)"
+          variant="outlined"
+          density="comfortable"
+          hide-details
+        />
+      </v-col>
+      <v-col cols="12" md="6" class="d-flex align-center">
+        <v-btn
+          variant="outlined"
+          prepend-icon="mdi-check-decagram"
+          :loading="isPrevalidating"
+          :disabled="isPrevalidating || selectedStudents.length === 0 || isLoadingAsignaturas"
+          @click="runPrevalidation"
+        >
+          Prevalidar selección
+        </v-btn>
+      </v-col>
+    </v-row>
+
     <v-alert v-if="error" type="error" variant="tonal" class="mb-4">
       {{ error }}
     </v-alert>
     <v-alert v-if="success" type="success" variant="tonal" class="mb-4">
       {{ success }}
+    </v-alert>
+    <v-alert v-if="prevalidationInfo" type="info" variant="tonal" class="mb-4">
+      {{ prevalidationInfo }}
     </v-alert>
 
     <v-row dense>
@@ -82,7 +123,7 @@
             :items="filteredAsignaturas"
             item-value="codAsignatura"
             show-select
-            :loading="isLoadingAsignaturas || isComputingExisting"
+            :loading="isLoadingAsignaturas || isPrevalidating"
             density="comfortable"
             :items-per-page="8"
           >
@@ -140,6 +181,7 @@ const isDev = computed(() => import.meta.env.DEV || false)
 
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
+const prevalidationInfo = ref<string | null>(null)
 
 const studentSearch = ref('')
 const asigSearch = ref('')
@@ -149,10 +191,10 @@ const isLoadingAsignaturas = ref(false)
 
 const selectedStudents = ref<StudentItem[]>([])
 const selectedAsignaturas = ref<AsignaturaItem[]>([])
-
-// Cache: uuid -> Set(codAsignatura) existentes
-const existingByStudent = ref<Record<string, Set<string>>>({})
-const isComputingExisting = ref(false)
+const anhoCursada = ref<number | null>(null)
+const semestreCursada = ref<number | null>(null)
+const isPrevalidating = ref(false)
+const prevalidationByCode = ref<Record<string, { assignable: number; blocked: number; total: number }>>({})
 
 const studentHeaders: VDataTable['$props']['headers'] = [
   { title: 'NOMBRE', key: 'nombre', sortable: true },
@@ -230,99 +272,161 @@ const fetchAsignaturas = async () => {
   }
 }
 
-const fetchExistingForStudent = async (student: StudentItem) => {
-  if (!student?.uuid) return
-  if (existingByStudent.value[student.uuid]) return
-
-  const token = await ensureToken()
-  const apiUrl = getApiBaseUrl()
-  const endpoint = isDev.value
-    ? `/api/v1/alumnos/usuario/${student.uuid}/asignaturas`
-    : `${apiUrl}/api/v1/alumnos/usuario/${student.uuid}/asignaturas`
-
-  const res = await fetch(endpoint, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+const buildAsignaturasPayload = (codes: string[]) =>
+  codes.map((codAsignatura) => {
+    const row: Record<string, unknown> = { codAsignatura }
+    if (anhoCursada.value) row.anhoCursada = anhoCursada.value
+    if (semestreCursada.value) row.semestreCursada = semestreCursada.value
+    row.nota = null
+    return row
   })
-  if (!res.ok) {
-    const t = await res.text().catch(() => '')
-    throw new Error(t || `Error ${res.status}`)
-  }
-  const payload = await res.json()
-  const dataArray: any[] = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.data)
-      ? payload.data
-      : []
 
-  const set = new Set<string>()
-  for (const it of dataArray) {
-    if (it?.codAsignatura) set.add(String(it.codAsignatura))
+type ValidationEntry = { codAsignatura: string; puedeAsignar: boolean }
+const collectValidationEntries = (node: unknown, acc: ValidationEntry[]) => {
+  if (Array.isArray(node)) {
+    for (const item of node) collectValidationEntries(item, acc)
+    return
   }
-  existingByStudent.value = { ...existingByStudent.value, [student.uuid]: set }
+  if (!node || typeof node !== 'object') return
+
+  const obj = node as Record<string, unknown>
+  const cod = typeof obj.codAsignatura === 'string' ? obj.codAsignatura : null
+  const puede = typeof obj.puedeAsignar === 'boolean' ? obj.puedeAsignar : null
+  if (cod && puede !== null) acc.push({ codAsignatura: cod, puedeAsignar: puede })
+
+  for (const key of Object.keys(obj)) {
+    collectValidationEntries(obj[key], acc)
+  }
 }
 
-const existingCountByAsig = computed(() => {
-  const counts: Record<string, number> = {}
-  const selected = selectedStudents.value
-  if (selected.length === 0) return counts
+const runPrevalidation = async (onlyCodes?: string[]) => {
+  error.value = null
+  prevalidationInfo.value = null
 
-  for (const s of selected) {
-    const set = existingByStudent.value[s.uuid]
-    if (!set) continue
-    for (const cod of set) {
-      counts[cod] = (counts[cod] || 0) + 1
-    }
+  if (selectedStudents.value.length === 0) {
+    prevalidationByCode.value = {}
+    return null
   }
-  return counts
-})
+
+  const auth0UserIds = selectedStudents.value
+    .map((s) => s.auth0UserId)
+    .filter(Boolean) as string[]
+  if (auth0UserIds.length !== selectedStudents.value.length) {
+    throw new Error('Faltan auth0UserId en uno o más estudiantes.')
+  }
+
+  const codes = (onlyCodes && onlyCodes.length > 0
+    ? onlyCodes
+    : asignaturas.value.map((a) => a.codAsignatura)
+  ).filter(Boolean)
+
+  if (codes.length === 0) {
+    prevalidationByCode.value = {}
+    return null
+  }
+
+  isPrevalidating.value = true
+  try {
+    const token = await ensureToken()
+    const apiUrl = getApiBaseUrl()
+    const endpoint = isDev.value
+      ? '/api/v1/alumnos/usuarios/asignaturas/prevalidar-masivo'
+      : `${apiUrl}/api/v1/alumnos/usuarios/asignaturas/prevalidar-masivo`
+
+    const body = {
+      auth0UserIds,
+      asignaturas: buildAsignaturasPayload(codes),
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => '')
+      throw new Error(t || `Error ${res.status}`)
+    }
+
+    const payload = await res.json().catch(() => ({}))
+    const entries: ValidationEntry[] = []
+    collectValidationEntries(payload?.resultados ?? payload, entries)
+
+    const byCode: Record<string, { assignable: number; blocked: number; total: number }> = {}
+    for (const cod of codes) {
+      byCode[cod] = { assignable: 0, blocked: 0, total: selectedStudents.value.length }
+    }
+    for (const entry of entries) {
+      const stat = byCode[entry.codAsignatura]
+      if (!stat) continue
+      if (entry.puedeAsignar) stat.assignable += 1
+      else stat.blocked += 1
+    }
+
+    prevalidationByCode.value = byCode
+    const resumen = payload?.resumen
+    if (resumen) {
+      prevalidationInfo.value =
+        `Prevalidación: asignables ${resumen.asignables ?? 0}, ` +
+        `ya asignadas con nota ${resumen.yaAsignadasConNota ?? 0}, ` +
+        `asignadas sin nota ${resumen.asignadasSinNota ?? 0}.`
+    } else {
+      prevalidationInfo.value = 'Prevalidación completada.'
+    }
+
+    return payload
+  } finally {
+    isPrevalidating.value = false
+  }
+}
 
 const availabilityLabel = (codAsignatura: string) => {
   const total = selectedStudents.value.length
   if (total === 0) return 'Selecciona estudiantes'
-  const have = existingCountByAsig.value[codAsignatura] || 0
-  if (have === 0) return `Disponible para ${total}/${total}`
-  if (have === total) return `Ya la tienen ${total}/${total}`
-  return `Disponible para ${total - have}/${total} (ya la tienen ${have})`
+  const stat = prevalidationByCode.value[codAsignatura]
+  if (!stat) return 'Pendiente de prevalidación'
+  if (stat.blocked === 0) return `Asignable para ${stat.assignable}/${total}`
+  if (stat.assignable === 0) return `No asignable (${stat.blocked}/${total})`
+  return `Parcial: ${stat.assignable}/${total} asignables`
 }
 
 const isAsignaturaDisabled = (codAsignatura: string) => {
-  const total = selectedStudents.value.length
-  if (total === 0) return true
-  const have = existingCountByAsig.value[codAsignatura] || 0
-  // Si TODOS los estudiantes seleccionados ya la tienen, no se puede seleccionar
-  return have >= total
+  if (selectedStudents.value.length === 0) return true
+  const stat = prevalidationByCode.value[codAsignatura]
+  if (!stat) return true
+  // Regla estricta: si alguna combinación no es asignable, no se permite selección masiva.
+  return stat.blocked > 0
 }
 
 watch(
-  () => selectedStudents.value.map((s) => s.uuid).join('|'),
+  () => [
+    selectedStudents.value.map((s) => s.uuid).join('|'),
+    asignaturas.value.length,
+    anhoCursada.value ?? '',
+    semestreCursada.value ?? '',
+  ].join('|'),
   async () => {
     success.value = null
     error.value = null
+    prevalidationInfo.value = null
 
-    // Cuando cambian estudiantes, recalcular cache de existentes para los nuevos
-    const newlySelected = selectedStudents.value
-    if (newlySelected.length === 0) {
+    if (selectedStudents.value.length === 0) {
       selectedAsignaturas.value = []
+      prevalidationByCode.value = {}
       return
     }
 
-    isComputingExisting.value = true
     try {
-      for (const s of newlySelected) {
-        await fetchExistingForStudent(s)
-      }
-      // Si alguna asignatura seleccionada quedó inválida (todos ya la tienen), la quitamos
+      await runPrevalidation()
       selectedAsignaturas.value = selectedAsignaturas.value.filter(
         (a) => !isAsignaturaDisabled(a.codAsignatura),
       )
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Error al cargar asignaturas existentes del alumno'
-    } finally {
-      isComputingExisting.value = false
+      error.value = e instanceof Error ? e.message : 'Error al prevalidar asignaturas'
     }
   },
 )
@@ -350,10 +454,19 @@ const submit = async () => {
       throw new Error('Faltan auth0UserId en uno o más estudiantes. No se puede asignar masivamente por usuario.')
     }
 
-    const asignaturasPayload = selectedAsignaturas.value
-      .map((a) => a.codAsignatura)
-      .filter(Boolean)
-      .map((codAsignatura) => ({ codAsignatura, nota: null }))
+    const selectedCodes = selectedAsignaturas.value.map((a) => a.codAsignatura).filter(Boolean)
+    await runPrevalidation(selectedCodes)
+    const preErrors = selectedCodes.filter((cod) => {
+      const stat = prevalidationByCode.value[cod]
+      return !stat || stat.blocked > 0
+    })
+    if (preErrors.length > 0) {
+      throw new Error(
+        `Hay asignaturas no asignables según prevalidación: ${preErrors.join(', ')}. Ajusta la selección.`,
+      )
+    }
+
+    const asignaturasPayload = buildAsignaturasPayload(selectedCodes)
 
     const endpoint = isDev.value
       ? '/api/v1/alumnos/usuarios/asignaturas/asignar-masivo'
