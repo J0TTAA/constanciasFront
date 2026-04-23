@@ -208,9 +208,12 @@ const asigHeaders: VDataTable['$props']['headers'] = [
 ]
 
 const filteredStudents = computed(() => {
+  const validStudents = props.students.filter(
+    (s) => typeof s.auth0UserId === 'string' && s.auth0UserId.trim().length > 0,
+  )
   const q = studentSearch.value.trim().toLowerCase()
-  if (!q) return props.students
-  return props.students.filter((s) =>
+  if (!q) return validStudents
+  return validStudents.filter((s) =>
     [s.nombre, s.email, s.rut].filter(Boolean).join(' ').toLowerCase().includes(q),
   )
 })
@@ -303,14 +306,19 @@ const runPrevalidation = async (onlyCodes?: string[]) => {
   error.value = null
   prevalidationInfo.value = null
 
+  // Blindaje extra: si por cualquier razón llega un estudiante inválido, lo excluimos automáticamente
+  selectedStudents.value = selectedStudents.value.filter(
+    (s) => typeof s.auth0UserId === 'string' && s.auth0UserId.trim().length > 0,
+  )
+
   if (selectedStudents.value.length === 0) {
     prevalidationByCode.value = {}
     return null
   }
 
   const auth0UserIds = selectedStudents.value
-    .map((s) => s.auth0UserId)
-    .filter(Boolean) as string[]
+    .map((s) => s.auth0UserId?.trim())
+    .filter((id): id is string => !!id && id.length > 0)
   if (auth0UserIds.length !== selectedStudents.value.length) {
     error.value = 'Hay estudiantes sin auth0UserId. Refresca la lista o excluye esos usuarios.'
     return null
@@ -410,6 +418,17 @@ const isAsignaturaDisabled = (codAsignatura: string) => {
   // Regla estricta: si alguna combinación no es asignable, no se permite selección masiva.
   return stat.blocked > 0
 }
+
+watch(
+  () => props.students,
+  () => {
+    // Si cambia la lista desde el padre, limpiar selecciones inválidas
+    selectedStudents.value = selectedStudents.value.filter(
+      (s) => typeof s.auth0UserId === 'string' && s.auth0UserId.trim().length > 0,
+    )
+  },
+  { deep: true },
+)
 
 watch(
   () => [

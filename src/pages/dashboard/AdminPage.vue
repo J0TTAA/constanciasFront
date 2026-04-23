@@ -691,7 +691,7 @@ const studentsForMassAssign = computed(() =>
       nombre: u.nombre,
       email: u.email,
     }))
-    .filter((u: any) => !!u.auth0UserId),
+    .filter((u: any) => typeof u.auth0UserId === 'string' && u.auth0UserId.trim().length > 0),
 )
 
 // Cargar usuarios desde el backend
