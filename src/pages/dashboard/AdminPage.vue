@@ -708,6 +708,11 @@ const fetchMassAssignStudents = async () => {
       : `${apiUrl}/api/v1/usuarios/admin/usuarios/validos-auth0`
 
     const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
+    console.log('📌 [AdminPage] Cargando usuarios válidos para asignación masiva...')
+    console.log('   - Endpoint:', endpoint)
+    console.log('   - Modo:', isDevelopment ? 'Desarrollo (proxy)' : 'Producción')
+    console.log('   - Token presente:', !!cleanToken)
+
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
@@ -717,7 +722,17 @@ const fetchMassAssignStudents = async () => {
     })
 
     if (!response.ok) {
-      throw new Error(`Error ${response.status} al cargar usuarios válidos para asignación masiva.`)
+      const raw = await response.text().catch(() => '')
+      let detail = raw
+      try {
+        const json = JSON.parse(raw)
+        detail = json?.message || json?.error || raw
+      } catch {}
+
+      console.error('❌ [AdminPage] Error en /validos-auth0')
+      console.error('   - Status:', response.status, response.statusText)
+      console.error('   - Detalle:', detail || '(sin detalle)')
+      throw new Error(`Error ${response.status} en validos-auth0: ${detail || response.statusText}`)
     }
 
     const payload = await response.json()
@@ -741,8 +756,13 @@ const fetchMassAssignStudents = async () => {
         }
       })
       .filter((u: any) => u.auth0UserId.length > 0)
+    console.log('✅ [AdminPage] Usuarios válidos para asignación masiva:', massAssignStudents.value.length)
   } catch {
-    // Fallback silencioso: usar lista local de usuarios ya cargada
+    // Fallback: usar lista local de usuarios ya cargada
+    console.warn('⚠️ [AdminPage] Usando fallback local para asignación masiva.')
+    if (users.value.length === 0) {
+      await fetchUsers()
+    }
     massAssignStudents.value = users.value
       .map((u: any) => ({
         uuid: u.uuid || u.id,
@@ -752,6 +772,7 @@ const fetchMassAssignStudents = async () => {
         email: u.email,
       }))
       .filter((u: any) => u.auth0UserId.length > 0)
+    console.log('✅ [AdminPage] Usuarios fallback para asignación masiva:', massAssignStudents.value.length)
   } finally {
     isLoadingMassAssignStudents.value = false
   }
@@ -883,9 +904,9 @@ const fetchUsers = async () => {
 }
 
 // Cargar usuarios al montar el componente
-onMounted(() => {
-  fetchUsers()
-  fetchMassAssignStudents()
+onMounted(async () => {
+  await fetchUsers()
+  await fetchMassAssignStudents()
 })
 
 // Funciones auxiliares
