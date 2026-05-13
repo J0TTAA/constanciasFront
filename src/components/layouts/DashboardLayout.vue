@@ -1,5 +1,6 @@
 <template>
-  <v-app class="dashboard-app">
+  <!-- Un solo v-app vive en App.vue; anidar otro aquí rompe layout/clics del drawer en Vuetify -->
+  <div class="dashboard-app">
     <!-- === SIDEBAR (Navigation Drawer) === -->
     <v-navigation-drawer
       v-model="drawer"
@@ -7,11 +8,8 @@
       :temporary="isMobile"
       color="#1e5a3d"
       theme="dark"
-      app
-      class="sidebar-drawer"
       :elevation="12"
       :width="drawerWidth"
-      :class="{ 'sidebar-fixed': !isMobile }"
     >
       <v-list-item class="pa-4 d-flex justify-center">
         <v-img
@@ -61,13 +59,13 @@
 
     <!-- === BARRA SUPERIOR (App Bar) === -->
     <!-- Esto solo es visible en móviles para abrir el sidebar -->
-    <v-app-bar app color="white" elevation="1" v-if="isMobile">
+    <v-app-bar color="white" elevation="1" v-if="isMobile">
       <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
       <v-toolbar-title>Sistema de Gestión</v-toolbar-title>
     </v-app-bar>
 
     <!-- === CONTENIDO PRINCIPAL === -->
-    <v-main class="dashboard-main" :style="mainStyle">
+    <v-main class="dashboard-main">
       <!--
         Aquí es donde Vue Router inyectará las páginas
         (SolicitudesPage, AdminPage, etc.)
@@ -81,7 +79,7 @@
         </div>
       </router-view>
     </v-main>
-  </v-app>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -94,22 +92,9 @@ const auth = useAuthStore()
 const { name } = useDisplay()
 const router = useRouter()
 
-// Control del sidebar en móviles
 const drawer = ref(true)
 const isMobile = computed(() => name.value === 'xs' || name.value === 'sm')
 const drawerWidth = computed(() => (isMobile.value ? 220 : 256))
-const mainStyle = computed(() =>
-  isMobile.value
-    ? {}
-    : {
-        marginLeft: `${drawerWidth.value}px`,
-        width: `calc(100% - ${drawerWidth.value}px)`,
-        maxWidth: 'none',
-        marginRight: '0',
-        display: 'flex',
-        justifyContent: 'flex-start',
-      },
-)
 
 // En móvil, el sidebar empieza cerrado
 if (isMobile.value) {
@@ -137,22 +122,6 @@ const handleLogout = async () => {
 
 .sidebar-logo {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
-}
-
-.sidebar-drawer {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
-}
-
-.sidebar-fixed {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  z-index: 10;
 }
 
 .sidebar-links {
@@ -183,19 +152,11 @@ const handleLogout = async () => {
 
 .dashboard-app {
   min-height: 100vh;
-  display: flex;
   background-color: #ffffff;
-  overflow: hidden;
 }
 
 .dashboard-main {
-  flex: 1;
-  height: 100vh;
-  overflow-y: auto;
   background: #ffffff;
-  display: flex;
-  align-items: flex-start;
-  padding: 0;
 }
 
 .dashboard-container {

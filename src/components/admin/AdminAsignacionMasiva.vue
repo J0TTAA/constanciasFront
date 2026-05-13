@@ -56,6 +56,28 @@
     <v-alert v-if="success" type="success" variant="tonal" class="mb-4">
       {{ success }}
     </v-alert>
+    <v-expansion-panels v-if="assignmentErrors.length > 0" class="mb-4">
+      <v-expansion-panel>
+        <v-expansion-panel-title>
+          Ver detalle de errores ({{ assignmentErrors.length }})
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-list density="compact">
+            <v-list-item
+              v-for="(err, idx) in assignmentErrors"
+              :key="`${err.auth0UserId || 'sin-id'}-${err.codAsignatura || 'sin-cod'}-${idx}`"
+            >
+              <v-list-item-title>
+                {{ err.codAsignatura || 'Sin asignatura' }} - {{ err.mensaje || 'Sin detalle' }}
+              </v-list-item-title>
+              <v-list-item-subtitle v-if="err.auth0UserId">
+                Usuario: {{ err.auth0UserId }}
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
     <v-row dense>
       <v-col cols="12" md="6">
         <v-card variant="outlined" class="pa-4">
@@ -173,6 +195,9 @@ const isDev = computed(() => import.meta.env.DEV || false)
 
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
+const assignmentErrors = ref<Array<{ auth0UserId?: string; codAsignatura?: string; mensaje?: string }>>(
+  [],
+)
 
 const studentSearch = ref('')
 const asigSearch = ref('')
@@ -294,6 +319,7 @@ watch(
   () => {
     success.value = null
     error.value = null
+    assignmentErrors.value = []
     if (selectedStudents.value.length === 0) {
       selectedAsignaturas.value = []
     }
@@ -304,6 +330,7 @@ const isSubmitting = ref(false)
 const submit = async () => {
   error.value = null
   success.value = null
+  assignmentErrors.value = []
 
   if (selectedStudents.value.length === 0 || selectedAsignaturas.value.length === 0) {
     error.value = 'Selecciona estudiantes y asignaturas.'
@@ -351,6 +378,7 @@ const submit = async () => {
     const actualizadas = payload?.actualizadas ?? 0
     const omitidas = payload?.omitidas ?? 0
     const errores = Array.isArray(payload?.errores) ? payload.errores.length : 0
+    assignmentErrors.value = Array.isArray(payload?.errores) ? payload.errores : []
 
     success.value =
       `Asignación masiva finalizada. Creadas: ${creadas}, ` +

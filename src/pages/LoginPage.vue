@@ -436,8 +436,7 @@ const login = async () => {
 }
 
 const handleForgotPassword = () => {
-  // TODO: Implementar recuperación de contraseña
-  console.log('Recuperar contraseña para:', email.value)
+  router.push({ name: 'forgot-password-help' })
 }
 </script>
 

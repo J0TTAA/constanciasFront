@@ -59,7 +59,7 @@
         class="add-btn"
         @click="showAddDialog = true"
       >
-        + Programar Examen
+        + Registrar examen
       </v-btn>
     </div>
 
@@ -145,31 +145,37 @@
     <!-- Dialog para agregar examen -->
     <v-dialog v-model="showAddDialog" max-width="600">
       <v-card>
-        <v-card-title>Programar Examen</v-card-title>
+        <v-card-title>Registrar examen</v-card-title>
         <v-card-text>
           <v-text-field
             v-model="newExamen.fechaExamen"
-            label="Fecha y Hora del Examen"
+            label="Fecha y Hora del Examen *"
             type="datetime-local"
             variant="outlined"
             class="mb-4"
+            :rules="[v => !!v || 'La fecha es obligatoria']"
           ></v-text-field>
           <v-text-field
             v-model.number="newExamen.notaExamen"
-            label="Nota (opcional)"
+            label="Nota *"
             type="number"
             step="0.1"
-            min="1"
-            max="7"
+            min="1.0"
+            max="7.0"
             variant="outlined"
-            hint="Dejar vacío si el examen aún no se ha rendido"
+            hint="Debe estar entre 1.0 y 7.0"
             persistent-hint
+            :rules="[
+              v => v !== null && v !== undefined && v !== '' || 'La nota es obligatoria',
+              v => Number(v) >= 1.0 || 'La nota mínima es 1.0',
+              v => Number(v) <= 7.0 || 'La nota máxima es 7.0',
+            ]"
           ></v-text-field>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn variant="text" @click="showAddDialog = false">Cancelar</v-btn>
-          <v-btn color="#1e5a3d" @click="handleAddExamen">Programar</v-btn>
+          <v-btn color="#1e5a3d" @click="handleAddExamen">Registrar examen</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -300,7 +306,19 @@ const fetchExamenes = async () => {
 
 // Agregar examen
 const handleAddExamen = async () => {
-  if (!newExamen.value.fechaExamen || !props.userRut || !auth.token) return
+  const nota = Number(newExamen.value.notaExamen)
+  if (!newExamen.value.fechaExamen || !props.userRut || !auth.token) {
+    error.value = 'Debes ingresar la fecha del examen.'
+    return
+  }
+  if (newExamen.value.notaExamen === null || Number.isNaN(nota)) {
+    error.value = 'Debes ingresar la nota del examen.'
+    return
+  }
+  if (nota < 1.0 || nota > 7.0) {
+    error.value = 'La nota debe estar entre 1.0 y 7.0.'
+    return
+  }
 
   try {
     const apiUrl = getApiBaseUrl()
@@ -317,7 +335,7 @@ const handleAddExamen = async () => {
       },
       body: JSON.stringify({
         fechaExamen: newExamen.value.fechaExamen,
-        notaExamen: newExamen.value.notaExamen || undefined,
+        notaExamen: nota,
       }),
     })
 

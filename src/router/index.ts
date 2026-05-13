@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: false }, // No requiere auth para ver el login
     },
     {
+      path: '/ayuda-acceso',
+      name: 'forgot-password-help',
+      component: () => import('@/pages/ForgotPasswordHelpPage.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       // --- RUTA PADRE "DASHBOARD" ---
       path: '/dashboard',
       component: DashboardLayout, // Carga el "cascarón"
