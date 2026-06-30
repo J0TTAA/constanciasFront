@@ -59,7 +59,7 @@
         class="add-btn"
         @click="showAddDialog = true"
       >
-        + Registrar examen
+        Registrar examen
       </v-btn>
     </div>
 
@@ -227,6 +227,7 @@ import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog.vue'
+import { isValidGrade, parseApiError, unwrapApiList } from '@/utils/apiContract'
 
 const props = defineProps<{
   userId: string
@@ -278,7 +279,8 @@ const fetchExamenes = async () => {
       throw new Error(`Error ${response.status}`)
     }
 
-    const data = await response.json()
+    const payload = await response.json()
+    const data = unwrapApiList<any>(payload)
     
     // Mapear datos del backend
     examenes.value = data.map((examen: any) => {
@@ -315,7 +317,7 @@ const handleAddExamen = async () => {
     error.value = 'Debes ingresar la nota del examen.'
     return
   }
-  if (nota < 1.0 || nota > 7.0) {
+  if (!isValidGrade(nota)) {
     error.value = 'La nota debe estar entre 1.0 y 7.0.'
     return
   }
@@ -340,7 +342,7 @@ const handleAddExamen = async () => {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      const errorText = await parseApiError(response, 'Error al agregar examen')
       throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
@@ -365,6 +367,17 @@ const handleEditExamen = (examen: any) => {
 const handleUpdateExamen = async () => {
   if (!editingExamen.value || !props.userRut || !auth.token) return
 
+  if (!editingExamen.value.fechaExamen) {
+    error.value = 'Debes ingresar la fecha del examen.'
+    return
+  }
+
+  const nota = Number(editingExamen.value.nota)
+  if (Number.isNaN(nota) || !isValidGrade(nota)) {
+    error.value = 'La nota debe estar entre 1.0 y 7.0.'
+    return
+  }
+
   try {
     const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV || false
@@ -375,7 +388,7 @@ const handleUpdateExamen = async () => {
     const updateData: any = {}
     if (editingExamen.value.fechaExamen) updateData.fechaExamen = editingExamen.value.fechaExamen
     if (editingExamen.value.nota !== null && editingExamen.value.nota !== undefined) {
-      updateData.notaExamen = editingExamen.value.nota
+      updateData.notaExamen = nota
     }
 
     const response = await fetch(endpoint, {
@@ -388,7 +401,7 @@ const handleUpdateExamen = async () => {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      const errorText = await parseApiError(response, 'Error al actualizar examen')
       throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
@@ -593,4 +606,3 @@ const getEstadoColor = (estado: string): string => {
   }
 }
 </style>
-

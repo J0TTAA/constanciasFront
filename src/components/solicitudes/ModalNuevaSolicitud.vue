@@ -15,6 +15,10 @@
       </v-card-title>
 
       <v-card-text class="pa-4">
+        <v-alert v-if="formError" type="error" variant="tonal" class="mb-4">
+          {{ formError }}
+        </v-alert>
+
         <v-form ref="form" @submit.prevent="submitForm">
           <!--
             v-select para el Tipo de Constancia
@@ -129,6 +133,7 @@ const observaciones = ref('')
 const semestre = ref('')
 const proposito = ref('')
 const isLoading = ref(false)
+const formError = ref('')
 
 // Opciones del v-select
 const tiposDeConstancia = [
@@ -190,7 +195,6 @@ type Titulos = Partial<{
   titulo3: string
   titulo4: string
   titulo5: string
-  titulo7: string
 }>
 
 // Helper para construir títulos según tipo de constancia y género (mapeo oficial)
@@ -235,8 +239,6 @@ const buildTitulos = (tipo: string, generoSeleccionado: Genero | null): Titulos 
       titulo3: esMujer ? 'alumna' : 'alumno',
       titulo4: esMujer ? 'de la' : 'del',
       titulo5: esMujer ? 'interesada' : 'interesado',
-      // Pronombre usado en el template (solo definido para femenino en tu tabla)
-      titulo7: esMujer ? 'ella' : 'él',
     }
   }
 
@@ -266,13 +268,13 @@ const solicitudBody = computed(() => {
   if (!titulos) return null
 
   // Construimos el body con una lista explícita de campos.
-  // Esto evita enviar propiedades extra (p.ej. `titulo7`) que el backend rechaza para otros tipos.
+  // Esto evita enviar propiedades extra que el backend rechaza con forbidNonWhitelisted.
   if (tipoConstancia.value === 'Certificado de Notas') {
     const finalBody: Record<string, any> = {
       nombreTipoConstancia: baseBody.nombreTipoConstancia,
     }
 
-    ;(['titulo1', 'titulo3', 'titulo4', 'titulo5', 'titulo7'] as const).forEach((k) => {
+    ;(['titulo1', 'titulo3', 'titulo4', 'titulo5'] as const).forEach((k) => {
       if (titulos[k] !== undefined) finalBody[k] = titulos[k]
     })
 
@@ -323,24 +325,46 @@ const rules = {
 
 // --- Acciones ---
 const close = () => {
+  formError.value = ''
   emit('update:modelValue', false)
 }
 
 const submitForm = async () => {
+  formError.value = ''
   // 1. Validar el formulario
   if (!form.value) {
-    console.error('❌ [Modal] El formulario no está inicializado')
+    formError.value = 'No se pudo inicializar el formulario. Intenta nuevamente.'
     return
   }
 
-  // Para "Certificado de Notas", solo validar que se haya seleccionado el tipo
+  if (!tipoConstancia.value) {
+    formError.value = 'Selecciona un tipo de constancia.'
+    return
+  }
+
+  if (!genero.value) {
+    formError.value = 'Selecciona la denominación.'
+    return
+  }
+
+  if (tipoConstancia.value === 'Inscripción Asignaturas') {
+    const semestreBase = constanciaBodies['Inscripción Asignaturas'].base.semestre || ''
+    const semestreNormalizado = normalizeSemestreForBackend(semestre.value || semestreBase)
+    if (!/^Nivel\s+[12]$/i.test(semestreNormalizado)) {
+      formError.value = 'El semestre debe ser Nivel 1 o Nivel 2.'
+      return
+    }
+  }
+
+  // Para "Certificado de Notas", validar tipo y denominación; el body no debe enviar campos extra al DTO.
   if (tipoConstancia.value === 'Certificado de Notas') {
     if (!solicitudBody.value) {
-      console.error('❌ [Modal] No se pudo generar el body de la solicitud')
+      formError.value = 'No se pudo generar la solicitud. Revisa los campos seleccionados.'
       return
     }
     emit('submit', solicitudBody.value)
     tipoConstancia.value = null
+    genero.value = null
     observaciones.value = ''
     return
   }
@@ -350,7 +374,7 @@ const submitForm = async () => {
   if (!valid) return
 
   if (!solicitudBody.value) {
-    console.error('❌ [Modal] No se pudo generar el body de la solicitud')
+    formError.value = 'No se pudo generar la solicitud. Revisa los campos seleccionados.'
     return
   }
 
@@ -367,5 +391,6 @@ const submitForm = async () => {
 
 watch(tipoConstancia, () => {
   genero.value = null
+  formError.value = ''
 })
 </script>

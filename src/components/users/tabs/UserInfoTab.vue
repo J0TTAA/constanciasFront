@@ -203,6 +203,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { isValidEmail, isValidRut, parseApiError } from '@/utils/apiContract'
 
 interface User {
   id: string
@@ -259,6 +260,37 @@ watch(() => props.user, (newUser) => {
 const handleSave = async () => {
   saveError.value = null
   saveSuccess.value = null
+
+  if (!localUser.value.email || !isValidEmail(localUser.value.email)) {
+    saveError.value = 'Ingresa un correo electrónico válido.'
+    return
+  }
+
+  if (!localUser.value.rut || !isValidRut(localUser.value.rut)) {
+    saveError.value = 'Ingresa un RUT válido. Ejemplo: 12.345.678-9.'
+    return
+  }
+
+  if (!localUser.value.primerNombre?.trim()) {
+    saveError.value = 'El primer nombre es obligatorio.'
+    return
+  }
+
+  if (!localUser.value.apellidoPaterno?.trim()) {
+    saveError.value = 'El apellido paterno es obligatorio.'
+    return
+  }
+
+  if (!localUser.value.fechaIngreso) {
+    saveError.value = 'La fecha de ingreso es obligatoria.'
+    return
+  }
+
+  if (localUser.value.fechaTermino && localUser.value.fechaTermino < localUser.value.fechaIngreso) {
+    saveError.value = 'La fecha de término no puede ser anterior a la fecha de ingreso.'
+    return
+  }
+
   isSaving.value = true
 
   try {
@@ -302,7 +334,7 @@ const handleSave = async () => {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      const errorText = await parseApiError(response, 'Error al guardar los cambios.')
       throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
@@ -356,4 +388,3 @@ const handleSave = async () => {
   color: white;
 }
 </style>
-

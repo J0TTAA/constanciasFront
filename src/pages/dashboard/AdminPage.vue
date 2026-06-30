@@ -44,7 +44,7 @@
       ></v-text-field>
       <v-select
         v-model="selectedRole"
-        :items="roleOptions"
+        :items="roleFilterOptions"
         variant="outlined"
         density="comfortable"
         hide-details
@@ -72,9 +72,8 @@
       </v-alert>
       <v-data-table
         :headers="headers"
-        :items="users"
-        :items-per-page="itemsPerPage"
-        :page="currentPage"
+        :items="filteredUsers"
+        :items-per-page="-1"
         :loading="isLoadingUsers"
         class="users-table"
         hide-default-footer
@@ -147,7 +146,7 @@
       <div class="table-footer">
         <div class="footer-left">
           <span class="text-caption text-medium-emphasis">
-            Mostrando {{ displayedUsers }} de {{ totalUsers }} usuarios
+            Mostrando {{ displayedUsersLabel }} de {{ totalUsers }} usuarios
           </span>
         </div>
         <div class="footer-right">
@@ -156,6 +155,7 @@
             :length="totalPages"
             :total-visible="5"
             density="comfortable"
+            :disabled="isLoadingUsers || hasActiveClientFilters"
           ></v-pagination>
         </div>
       </div>
@@ -479,13 +479,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import type { VDataTable } from 'vuetify/components'
 import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
 import UserDetailView from '@/components/users/UserDetailView.vue'
 import AdminExcelImport from '@/components/admin/AdminExcelImport.vue'
 import AdminAsignacionMasiva from '@/components/admin/AdminAsignacionMasiva.vue'
+import { isValidEmail, isValidRut, parseApiError, unwrapApiList } from '@/utils/apiContract'
 
 const auth = useAuthStore()
 
@@ -559,6 +560,26 @@ const handleSubmit = async () => {
   // Validaciones básicas de campos requeridos
   if (!email.value || !password.value || !rut.value || !firstName.value || !lastNameFather.value || !numeroMatricula.value || !fechaIngreso.value) {
     submitError.value = 'Por favor completa todos los campos obligatorios: correo, contraseña, RUT, primer nombre, apellido paterno, número de matrícula y fecha de ingreso.'
+    return
+  }
+
+  if (!isValidEmail(email.value)) {
+    submitError.value = 'Ingresa un correo electrónico válido.'
+    return
+  }
+
+  if (password.value.length < 6) {
+    submitError.value = 'La contraseña debe tener al menos 6 caracteres.'
+    return
+  }
+
+  if (!isValidRut(rut.value)) {
+    submitError.value = 'Ingresa un RUT válido. Ejemplo: 12.345.678-9.'
+    return
+  }
+
+  if (fechaTermino.value && fechaTermino.value < fechaIngreso.value) {
+    submitError.value = 'La fecha de término no puede ser anterior a la fecha de ingreso.'
     return
   }
 
@@ -637,12 +658,15 @@ const handleSubmit = async () => {
       throw new Error(errorMessage)
     }
 
+    handleReset()
     // Éxito
     submitSuccess.value = 'Usuario creado correctamente.'
-    handleReset()
     // Opcional: regresar a la lista después de 2 segundos
-    setTimeout(() => {
+    setTimeout(async () => {
       showCreateForm.value = false
+      currentPage.value = 1
+      await fetchUsers()
+      await fetchMassAssignStudents()
     }, 2000)
   } catch (error) {
     console.error('Error al crear usuario:', error)
@@ -666,9 +690,14 @@ const searchQuery = ref('')
 const selectedRole = ref('Todos los roles')
 const selectedStatus = ref('Todos')
 const currentPage = ref(1)
-const itemsPerPage = ref(6)
+const itemsPerPage = ref(10)
+const totalUsersFromApi = ref(0)
+const totalPagesFromApi = ref(1)
+const pageFromApi = ref(1)
+const limitFromApi = ref(10)
 
 const statusOptions = ['Todos', 'Activo', 'Inactivo']
+const roleFilterOptions = computed(() => ['Todos los roles', ...roleOptions])
 
 const headers: VDataTable['$props']['headers'] = [
   { title: 'USUARIO', key: 'usuario', sortable: false },
@@ -679,13 +708,48 @@ const headers: VDataTable['$props']['headers'] = [
   { title: 'ACCIONES', key: 'acciones', sortable: false, align: 'end' },
 ]
 
-const totalUsers = computed(() => users.value.length)
-const displayedUsers = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return Math.min(end, totalUsers.value)
+const hasActiveClientFilters = computed(
+  () =>
+    searchQuery.value.trim().length > 0 ||
+    selectedRole.value !== 'Todos los roles' ||
+    selectedStatus.value !== 'Todos',
+)
+
+const filteredUsers = computed(() => {
+  let items = [...users.value]
+  const query = searchQuery.value.trim().toLowerCase()
+
+  if (query) {
+    items = items.filter((user) =>
+      [user.nombre, user.email, user.rut, user.matricula]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    )
+  }
+
+  if (selectedRole.value !== 'Todos los roles') {
+    items = items.filter((user) => user.rol === selectedRole.value)
+  }
+
+  if (selectedStatus.value !== 'Todos') {
+    items = items.filter((user) => user.estado === selectedStatus.value)
+  }
+
+  return items
 })
-const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value))
+
+const totalUsers = computed(() => totalUsersFromApi.value)
+const totalPages = computed(() => (hasActiveClientFilters.value ? 1 : totalPagesFromApi.value))
+const displayedUsersLabel = computed(() => {
+  if (totalUsers.value === 0) return '0'
+  if (hasActiveClientFilters.value) return String(filteredUsers.value.length)
+
+  const start = (pageFromApi.value - 1) * limitFromApi.value + 1
+  const end = Math.min(start + users.value.length - 1, totalUsers.value)
+  return `${start}-${end}`
+})
 
 const studentsForMassAssign = computed(() =>
   massAssignStudents.value,
@@ -736,11 +800,7 @@ const fetchMassAssignStudents = async () => {
     }
 
     const payload = await response.json()
-    const dataArray: any[] = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : []
+    const dataArray = unwrapApiList<any>(payload)
 
     massAssignStudents.value = dataArray
       .map((user: any) => {
@@ -806,9 +866,12 @@ const fetchUsers = async () => {
   try {
     const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV || false
+    const requestedLimit = hasActiveClientFilters.value ? 100 : itemsPerPage.value
+    const requestedPage = hasActiveClientFilters.value ? 1 : currentPage.value
+    const query = `page=${requestedPage}&limit=${requestedLimit}`
     const endpoint = isDevelopment
-      ? '/api/v1/usuarios/estudiantes'
-      : `${apiUrl}/api/v1/usuarios/estudiantes`
+      ? `/api/v1/usuarios/estudiantes?${query}`
+      : `${apiUrl}/api/v1/usuarios/estudiantes?${query}`
 
     // Limpiar el token de espacios
     const cleanToken = tokenFromStore.trim().replace(/\s+/g, '')
@@ -859,11 +922,14 @@ const fetchUsers = async () => {
     const payload = await response.json()
     console.log('✅ [AdminPage] Usuarios cargados exitosamente (payload):', payload)
     
-    const dataArray: any[] = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : []
+    const dataArray = unwrapApiList<any>(payload)
+    totalUsersFromApi.value = Number(payload?.total ?? dataArray.length)
+    pageFromApi.value = Number(payload?.page ?? requestedPage)
+    limitFromApi.value = Number(payload?.limit ?? requestedLimit)
+    totalPagesFromApi.value = Math.max(
+      1,
+      Number(payload?.totalPages ?? Math.ceil(totalUsersFromApi.value / limitFromApi.value)),
+    )
 
     // Mapear los datos del backend al formato esperado por la tabla
     users.value = dataArray.map((user: any) => {
@@ -907,6 +973,19 @@ const fetchUsers = async () => {
 onMounted(async () => {
   await fetchUsers()
   await fetchMassAssignStudents()
+})
+
+watch(currentPage, () => {
+  if (!hasActiveClientFilters.value) {
+    fetchUsers()
+  }
+})
+
+watch([searchQuery, selectedRole, selectedStatus], () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  }
+  fetchUsers()
 })
 
 // Funciones auxiliares

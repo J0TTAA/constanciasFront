@@ -59,7 +59,7 @@
         class="add-btn"
         @click="showAddDialog = true"
       >
-        + Agregar Nota
+        Agregar Nota
       </v-btn>
     </div>
 
@@ -275,6 +275,7 @@ import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog.vue'
+import { isValidGrade, isValidSemester, isValidYear, parseApiError, unwrapApiList } from '@/utils/apiContract'
 
 const props = defineProps<{
   userId: string
@@ -330,19 +331,20 @@ const fetchNotas = async () => {
       throw new Error(`Error ${response.status}`)
     }
 
-    const data = await response.json()
+    const payload = await response.json()
+    const data = unwrapApiList<any>(payload)
     
     // Mapear datos del backend y filtrar solo las notas que tienen valor numérico
     // Las asignaturas sin nota (nota = null) NO deben aparecer en la tabla
     notas.value = data
-      .filter((nota: any) => nota.nota !== null && nota.nota !== undefined && typeof nota.nota === 'number')
+      .filter((nota: any) => nota.nota !== null && nota.nota !== undefined && !Number.isNaN(Number(nota.nota)))
       .map((nota: any) => ({
         id: nota.idNota,
         asignatura: nota.asignatura?.nombreAsignatura || nota.codAsignatura,
         codAsignatura: nota.codAsignatura,
         tipo: 'Nota', // Tipo genérico, se puede personalizar
         descripcion: `${nota.asignatura?.nombreAsignatura || ''} - ${nota.anhoCursada}-${nota.semestreCursada}`,
-        nota: nota.nota,
+        nota: Number(nota.nota),
         ponderacion: '100%', // No viene en el endpoint
         fecha: nota.anhoCursada ? `${nota.semestreCursada}-${nota.anhoCursada}` : '',
         anhoCursada: nota.anhoCursada,
@@ -391,11 +393,7 @@ const fetchAvailableAsignaturas = async () => {
     }
 
     const data = await response.json()
-    const dataArray: any[] = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.data)
-        ? data.data
-        : []
+    const dataArray = unwrapApiList<any>(data)
     // El endpoint devuelve asignaturas del alumno; mapear a codAsignatura / nombreAsignatura
     availableAsignaturas.value = dataArray.map((asig: any) => ({
       codAsignatura: asig.codAsignatura || asig.codigo,
@@ -435,13 +433,23 @@ const handleAddNota = async () => {
     return
   }
 
+  if (!isValidYear(Number(newNota.value.anhoCursada))) {
+    error.value = 'El año cursada debe ser un número entre 1900 y 2100.'
+    return
+  }
+
+  if (!isValidSemester(Number(newNota.value.semestreCursada))) {
+    error.value = 'El semestre debe ser 1 o 2.'
+    return
+  }
+
   // Validar que la nota sea obligatoria y tenga un valor válido
-  if (!newNota.value.nota || newNota.value.nota === null || newNota.value.nota === undefined) {
+  if (newNota.value.nota === null || newNota.value.nota === undefined || Number.isNaN(Number(newNota.value.nota))) {
     error.value = 'Debes ingresar una nota. El campo de nota es obligatorio.'
     return
   }
 
-  if (newNota.value.nota < 1 || newNota.value.nota > 7) {
+  if (!isValidGrade(Number(newNota.value.nota))) {
     error.value = 'La nota debe estar entre 1.0 y 7.0'
     return
   }
@@ -455,11 +463,6 @@ const handleAddNota = async () => {
 
   // Si no hay nota para agregar y no existe registro previo, permitir crear sin nota
   // El backend manejará automáticamente si existe un registro con nota = null
-
-  if (!props.userMatricula) {
-    error.value = 'No se pudo obtener la matrícula del estudiante. Por favor, verifica los datos del usuario.'
-    return
-  }
 
   try {
     const apiUrl = getApiBaseUrl()
@@ -476,37 +479,14 @@ const handleAddNota = async () => {
       },
       body: JSON.stringify({
         codAsignatura: newNota.value.codAsignatura,
-        anhoCursada: newNota.value.anhoCursada,
-        semestreCursada: newNota.value.semestreCursada,
-        nota: newNota.value.nota || null,
-        nroMatricula: props.userMatricula,
+        anhoCursada: Number(newNota.value.anhoCursada),
+        semestreCursada: Number(newNota.value.semestreCursada),
+        nota: Number(newNota.value.nota),
       }),
     })
 
     if (!response.ok) {
-      let errorMessage = 'Error al agregar nota'
-      try {
-        const errorText = await response.text()
-        let errorData: any = null
-        try {
-          errorData = JSON.parse(errorText)
-        } catch {
-          errorData = { message: errorText }
-        }
-
-        // Extraer el mensaje del error del backend
-        if (errorData.message) {
-          if (Array.isArray(errorData.message)) {
-            errorMessage = errorData.message.join(', ')
-          } else if (typeof errorData.message === 'string') {
-            errorMessage = errorData.message
-          }
-        } else if (errorData.error) {
-          errorMessage = errorData.error
-        }
-      } catch (e) {
-        console.error('Error al parsear respuesta de error:', e)
-      }
+      const errorMessage = await parseApiError(response, 'Error al agregar nota')
       throw new Error(errorMessage)
     }
 
@@ -539,6 +519,23 @@ const handleEditNota = (nota: any) => {
 const handleUpdateNota = async () => {
   if (!editingNota.value || !props.userRut || !auth.token) return
 
+  if (!editingNota.value.codAsignatura) {
+    error.value = 'La asignatura es obligatoria.'
+    return
+  }
+  if (!isValidYear(Number(editingNota.value.anhoCursada))) {
+    error.value = 'El año cursada debe ser un número entre 1900 y 2100.'
+    return
+  }
+  if (!isValidSemester(Number(editingNota.value.semestreCursada))) {
+    error.value = 'El semestre debe ser 1 o 2.'
+    return
+  }
+  if (!isValidGrade(Number(editingNota.value.nota))) {
+    error.value = 'La nota debe estar entre 1.0 y 7.0.'
+    return
+  }
+
   try {
     const apiUrl = getApiBaseUrl()
     const isDevelopment = import.meta.env.DEV || false
@@ -548,9 +545,9 @@ const handleUpdateNota = async () => {
 
     const updateData: any = {}
     if (editingNota.value.codAsignatura) updateData.codAsignatura = editingNota.value.codAsignatura
-    if (editingNota.value.anhoCursada) updateData.anhoCursada = editingNota.value.anhoCursada
-    if (editingNota.value.semestreCursada) updateData.semestreCursada = editingNota.value.semestreCursada
-    if (editingNota.value.nota !== null) updateData.nota = editingNota.value.nota
+    if (editingNota.value.anhoCursada) updateData.anhoCursada = Number(editingNota.value.anhoCursada)
+    if (editingNota.value.semestreCursada) updateData.semestreCursada = Number(editingNota.value.semestreCursada)
+    if (editingNota.value.nota !== null) updateData.nota = Number(editingNota.value.nota)
 
     const response = await fetch(endpoint, {
       method: 'PATCH',
@@ -562,7 +559,7 @@ const handleUpdateNota = async () => {
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
+      const errorText = await parseApiError(response, 'Error al actualizar nota')
       throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
@@ -801,4 +798,3 @@ const semestresDisponibles = computed(() => {
   }
 }
 </style>
-

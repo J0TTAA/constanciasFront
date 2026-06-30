@@ -145,6 +145,12 @@ const submit = async () => {
     return
   }
 
+  const fileName = file.value.name.toLowerCase()
+  if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+    error.value = 'El archivo debe tener formato .xlsx o .xls.'
+    return
+  }
+
   if (!auth.initialized) await auth.loadFromStorage()
   const token = auth.token?.trim().replace(/\s+/g, '')
   if (!token) {

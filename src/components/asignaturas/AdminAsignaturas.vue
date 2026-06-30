@@ -54,6 +54,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import type { VDataTable } from 'vuetify/components'
+import { parseApiError } from '@/utils/apiContract'
 
 const auth = useAuthStore()
 
@@ -142,22 +143,8 @@ const fetchAsignaturas = async () => {
     })
 
     if (!response.ok) {
-      let errorText = ''
-      let errorData: any = null
-      
-      try {
-        errorText = await response.text()
-        try {
-          errorData = JSON.parse(errorText)
-        } catch {
-          errorData = { message: errorText }
-        }
-      } catch (e) {
-        errorText = 'No se pudo leer el cuerpo de la respuesta'
-        errorData = { message: errorText }
-      }
-
-      throw new Error(`Error ${response.status}: ${errorData.message || errorText}`)
+      const errorText = await parseApiError(response, 'Error al cargar asignaturas')
+      throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
     const rawData = await response.json()

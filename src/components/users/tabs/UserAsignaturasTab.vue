@@ -59,7 +59,7 @@
         class="add-btn"
         @click="handleOpenAssignDialog"
       >
-        + Asignar Asignatura
+        Asignar Asignatura
       </v-btn>
     </div>
 
@@ -206,6 +206,7 @@ import type { VDataTable } from 'vuetify/components'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog.vue'
+import { isValidGrade, isValidSemester, isValidYear, parseApiError, unwrapApiList } from '@/utils/apiContract'
 
 const props = defineProps<{
   userId: string
@@ -218,6 +219,7 @@ const searchQuery = ref('')
 const selectedFilter = ref('Todos')
 const filterOptions = ['Todos', 'Aprobadas', 'Cursando', 'Pendientes', 'Reprobadas']
 type AsignaturaTableItem = {
+  idNota: number | null
   codigo: string
   nombreAsignatura: string
   nivel: string
@@ -323,11 +325,7 @@ const fetchAsignaturas = async () => {
     const payload = await response.json()
     console.log('📚 [UserAsignaturasTab] Asignaturas recibidas (payload):', payload)
     
-    const dataArray: any[] = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : []
+    const dataArray = unwrapApiList<any>(payload)
     
     // Contrato del backend:
     // { codAsignatura, nombreAsignatura, nivel, nota, anhoCursada, semestreCursada }
@@ -360,6 +358,7 @@ const fetchAsignaturas = async () => {
           : 'Reprobada'
 
       return {
+      idNota: Number.isFinite(Number(asig.idNota)) ? Number(asig.idNota) : null,
       codigo: asig.codAsignatura || 'N/A',
       nombreAsignatura: asig.nombreAsignatura || 'N/A',
       nivel: asig.nivel || 'N/A',
@@ -439,11 +438,7 @@ const fetchAvailableAsignaturas = async () => {
     const payload = await response.json()
     console.log('✅ [UserAsignaturasTab] Asignaturas disponibles recibidas:', payload)
     
-    const dataArray: any[] = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : []
+    const dataArray = unwrapApiList<any>(payload)
     
     availableAsignaturas.value = dataArray.map((asig: any) => ({
       codAsignatura: asig.codAsignatura,
@@ -477,6 +472,26 @@ const handleAssignAsignatura = async () => {
     return
   }
 
+  if (!selectedAsignatura.value.codAsignatura) {
+    error.value = 'La asignatura seleccionada no tiene código válido.'
+    return
+  }
+
+  if (anhoCursada.value && !isValidYear(Number(anhoCursada.value))) {
+    error.value = 'El año cursada debe ser un número entre 1900 y 2100.'
+    return
+  }
+
+  if (semestreCursada.value && !isValidSemester(Number(semestreCursada.value))) {
+    error.value = 'El semestre debe ser 1 o 2.'
+    return
+  }
+
+  if (nota.value !== null && nota.value !== undefined && !isValidGrade(Number(nota.value))) {
+    error.value = 'La nota debe estar entre 1.0 y 7.0.'
+    return
+  }
+
   // Validar que tengamos el UUID del usuario
   const userUuid = props.userUuid || props.userId
   if (!userUuid) {
@@ -502,13 +517,13 @@ const handleAssignAsignatura = async () => {
 
     // Agregar campos opcionales solo si tienen valores
     if (anhoCursada.value) {
-      body.anhoCursada = anhoCursada.value
+      body.anhoCursada = Number(anhoCursada.value)
     }
     if (semestreCursada.value) {
-      body.semestreCursada = semestreCursada.value
+      body.semestreCursada = Number(semestreCursada.value)
     }
     if (nota.value !== null && nota.value !== undefined) {
-      body.nota = nota.value
+      body.nota = Number(nota.value)
     }
 
     console.log('📝 [UserAsignaturasTab] Asignando asignatura:', body)
@@ -523,22 +538,7 @@ const handleAssignAsignatura = async () => {
     })
 
     if (!response.ok) {
-      let errorText = ''
-      let errorData: any = null
-      
-      try {
-        errorText = await response.text()
-        try {
-          errorData = JSON.parse(errorText)
-        } catch {
-          errorData = { message: errorText }
-        }
-      } catch (e) {
-        errorText = 'No se pudo leer el cuerpo de la respuesta'
-        errorData = { message: errorText }
-      }
-
-      const errorMessage = errorData.message || errorData.error || errorText
+      const errorMessage = await parseApiError(response, 'Error al asignar asignatura')
       throw new Error(`Error ${response.status}: ${errorMessage}`)
     }
 
@@ -636,13 +636,17 @@ const handleDelete = (item: any) => {
 const confirmDeleteAsignatura = async () => {
   if (!asignaturaToDelete.value || !auth.token) return
 
-  const userUuid = props.userUuid || props.userId
-  if (!userUuid) {
-    error.value = 'No se pudo obtener el UUID del usuario.'
+  if (!props.userRut) {
+    error.value = 'No se pudo obtener el RUT del usuario para eliminar la asignatura.'
     return
   }
 
-  const codAsignatura = asignaturaToDelete.value.codigo
+  const idNota = Number(asignaturaToDelete.value.idNota)
+  if (!Number.isInteger(idNota) || idNota <= 0) {
+    error.value = 'La asignatura no incluye idNota; no se puede eliminar con seguridad.'
+    return
+  }
+
   isDeleting.value = true
 
   try {
@@ -650,12 +654,11 @@ const confirmDeleteAsignatura = async () => {
     const isDevelopment = import.meta.env.DEV || false
     const cleanToken = auth.token.trim()
 
-    // Endpoint principal esperado (REST por recurso)
-    const endpointByCode = isDevelopment
-      ? `/api/v1/alumnos/usuario/${userUuid}/asignaturas/${encodeURIComponent(codAsignatura)}`
-      : `${apiUrl}/api/v1/alumnos/usuario/${userUuid}/asignaturas/${encodeURIComponent(codAsignatura)}`
+    const endpoint = isDevelopment
+      ? `/api/v1/alumnos/${props.userRut}/notas/${idNota}`
+      : `${apiUrl}/api/v1/alumnos/${props.userRut}/notas/${idNota}`
 
-    let response = await fetch(endpointByCode, {
+    const response = await fetch(endpoint, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -663,29 +666,8 @@ const confirmDeleteAsignatura = async () => {
       },
     })
 
-    // Fallback para implementaciones que usan /desasignar con body
     if (!response.ok) {
-      const endpointFallback = isDevelopment
-        ? `/api/v1/alumnos/usuario/${userUuid}/asignaturas/desasignar`
-        : `${apiUrl}/api/v1/alumnos/usuario/${userUuid}/asignaturas/desasignar`
-
-      response = await fetch(endpointFallback, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cleanToken}`,
-        },
-        body: JSON.stringify({ codAsignatura }),
-      })
-    }
-
-    if (!response.ok) {
-      let errorText = ''
-      try {
-        errorText = await response.text()
-      } catch {
-        errorText = 'Error al eliminar asignatura'
-      }
+      const errorText = await parseApiError(response, 'Error al eliminar asignatura')
       throw new Error(`Error ${response.status}: ${errorText}`)
     }
 
@@ -778,4 +760,3 @@ const cancelDeleteAsignatura = () => {
   }
 }
 </style>
-

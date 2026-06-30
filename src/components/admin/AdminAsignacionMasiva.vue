@@ -170,6 +170,7 @@ import { computed, ref, watch } from 'vue'
 import type { VDataTable } from 'vuetify/components'
 import { getApiBaseUrl } from '@/config/api'
 import { useAuthStore } from '@/stores/auth'
+import { isValidSemester, isValidYear, parseApiError, unwrapApiList } from '@/utils/apiContract'
 
 type StudentItem = {
   uuid: string
@@ -269,11 +270,7 @@ const fetchAsignaturas = async () => {
     }
 
     const payload = await res.json()
-    const dataArray: any[] = Array.isArray(payload)
-      ? payload
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : []
+    const dataArray = unwrapApiList<any>(payload)
 
     asignaturas.value = dataArray
       .map((a: any) => ({
@@ -294,7 +291,6 @@ const buildAsignaturasPayload = (codes: string[]) =>
     const row: Record<string, unknown> = { codAsignatura }
     if (anhoCursada.value) row.anhoCursada = anhoCursada.value
     if (semestreCursada.value) row.semestreCursada = semestreCursada.value
-    row.nota = null
     return row
   })
 
@@ -337,6 +333,16 @@ const submit = async () => {
     return
   }
 
+  if (anhoCursada.value !== null && !isValidYear(Number(anhoCursada.value))) {
+    error.value = 'El año cursada debe ser un número entre 1900 y 2100.'
+    return
+  }
+
+  if (semestreCursada.value !== null && !isValidSemester(Number(semestreCursada.value))) {
+    error.value = 'El semestre debe ser 1 o 2.'
+    return
+  }
+
   isSubmitting.value = true
   try {
     const token = await ensureToken()
@@ -369,7 +375,7 @@ const submit = async () => {
     })
 
     if (!res.ok) {
-      const t = await res.text().catch(() => '')
+      const t = await parseApiError(res, 'Error al asignar masivamente')
       throw new Error(t || `Error ${res.status}`)
     }
 

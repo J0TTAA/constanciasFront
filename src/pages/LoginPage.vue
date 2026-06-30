@@ -134,6 +134,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { jwtDecode } from 'jwt-decode'
 import { useAuthStore } from '@/stores/auth'
+import { isValidEmail } from '@/utils/apiContract'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -180,6 +181,12 @@ const login = async () => {
     if (!email.value) emailError.value = 'Ingresa tu correo.'
     if (!password.value) passwordError.value = 'Ingresa tu contraseña.'
     auth.captureError(new Error('Completa correo y contraseña.'))
+    return
+  }
+
+  if (!isValidEmail(email.value)) {
+    emailError.value = 'Ingresa un correo válido.'
+    auth.captureError(new Error('Ingresa un correo válido.'))
     return
   }
   

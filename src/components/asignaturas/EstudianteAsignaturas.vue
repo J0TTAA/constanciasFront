@@ -82,6 +82,7 @@ import { jwtDecode } from 'jwt-decode'
 import { useAuthStore } from '@/stores/auth'
 import { getApiBaseUrl } from '@/config/api'
 import type { VDataTable } from 'vuetify/components'
+import { unwrapApiList } from '@/utils/apiContract'
 
 const auth = useAuthStore()
 
@@ -255,7 +256,7 @@ const fetchNotas = async () => {
     }
 
     const data = await response.json()
-    notas.value = data
+    notas.value = unwrapApiList<any>(data)
     
   } catch (err) {
     console.error('Error al cargar notas:', err)
